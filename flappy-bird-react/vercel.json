@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "flappy-bird-react/package.json",
+      "use": "@vercel/node"
+    }
+  ],
+  "framework": "vite",
+  "outputDirectory": "flappy-bird-react/dist"
+}
