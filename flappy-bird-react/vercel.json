@@ -1,11 +1,14 @@
 {
-  "version": 2,
-  "builds": [
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "routes": [
     {
-      "src": "flappy-bird-react/package.json",
-      "use": "@vercel/node"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
-  ],
-  "framework": "vite",
-  "outputDirectory": "flappy-bird-react/dist"
+  ]
 }

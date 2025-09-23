@@ -20,6 +20,15 @@ export default function Home() {
   // Use the custom hook to check for Monad Games username
   const { user: monadUser, hasUsername, isLoading, error } = useMonadGamesUser(walletAddress);
 
+  // Add refresh function for username check
+  const refreshUsernameCheck = () => {
+    if (walletAddress) {
+      showStatusMessage('Rechecking username...', 'info');
+      // Force a re-fetch by updating the walletAddress dependency
+      window.location.reload();
+    }
+  };
+
   const showStatusMessage = (message: string, type: 'success' | 'error' | 'info') => {
     const newMessage = {
       id: messageCounter,
@@ -62,8 +71,15 @@ export default function Home() {
   };
 
   const handleStartGame = () => {
-    if (!authenticated || !hasUsername) {
-      showStatusMessage('Please connect wallet and register username first!', 'error');
+    console.log('Start game clicked:', { authenticated, hasUsername, monadUser });
+    
+    if (!authenticated || !walletAddress) {
+      showStatusMessage('Please connect your wallet first!', 'error');
+      return;
+    }
+
+    if (!hasUsername || !monadUser) {
+      showStatusMessage('Please register a username first!', 'error');
       return;
     }
 
@@ -107,6 +123,20 @@ export default function Home() {
     }
   }, [error]);
 
+  // Debug log
+  useEffect(() => {
+    console.log('Current state:', {
+      authenticated,
+      walletAddress,
+      hasUsername,
+      monadUser,
+      isLoading,
+      error
+    });
+  }, [authenticated, walletAddress, hasUsername, monadUser, isLoading, error]);
+
+  const canStartGame = authenticated && walletAddress && hasUsername && monadUser && !isLoading;
+
   return (
     <div className="home-container">
       {!authenticated ? (
@@ -128,7 +158,7 @@ export default function Home() {
           
           <div id="usernameStatus">
             {isLoading ? (
-              <div>Checking username...</div>
+              <div style={{ color: '#3498db' }}>Checking username...</div>
             ) : hasUsername && monadUser ? (
               <>
                 <div className="username-display">👤 {monadUser.username}</div>
@@ -137,15 +167,27 @@ export default function Home() {
             ) : (
               <div className="username-prompt">
                 <div style={{ color: '#ff6666', marginBottom: '8px' }}>⚠ Username Required</div>
-                <div style={{ fontSize: '8px', marginBottom: '8px' }}>You need a username to save scores</div>
+                <div style={{ fontSize: '8px', marginBottom: '8px' }}>You need a username to save scores and play</div>
                 <a 
                   href="https://monadclip.fun/register" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="register-link"
+                  onClick={() => showStatusMessage('Please complete username registration and refresh the page', 'info')}
                 >
                   Register Username
                 </a>
+                <div style={{ fontSize: '8px', color: '#ccc', marginTop: '5px' }}>
+                  After registering, click refresh below
+                </div>
+                <button 
+                  className="btn" 
+                  style={{ fontSize: '8px', padding: '6px 12px', marginTop: '8px' }}
+                  onClick={refreshUsernameCheck}
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Checking...' : 'Refresh Username'}
+                </button>
               </div>
             )}
           </div>
@@ -163,10 +205,31 @@ export default function Home() {
       <button 
         id="startBtn" 
         className="btn start-btn"
+        disabled={!canStartGame}
         onClick={handleStartGame}
+        style={{
+          backgroundColor: canStartGame ? '#7e30e1' : '#444',
+          cursor: canStartGame ? 'pointer' : 'not-allowed'
+        }}
       >
         START GAME
       </button>
+
+      {/* Debug info - remove in production */}
+      <div style={{ 
+        position: 'fixed', 
+        bottom: '50px', 
+        left: '10px', 
+        fontSize: '8px', 
+        background: 'rgba(0,0,0,0.8)', 
+        padding: '5px',
+        color: '#fff'
+      }}>
+        Debug: Auth: {authenticated ? '✓' : '✗'} | 
+        Wallet: {walletAddress ? '✓' : '✗'} | 
+        Username: {hasUsername ? '✓' : '✗'} | 
+        Loading: {isLoading ? '✓' : '✗'}
+      </div>
 
       <footer>
         <span className="pixel-text">Developed by</span>
