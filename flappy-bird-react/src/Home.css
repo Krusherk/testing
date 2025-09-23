@@ -1,0 +1,146 @@
+body {
+  margin: 0;
+  height: 100vh;
+  background-image: url('/images/dakdak.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  font-family: 'Press Start 2P', cursive;
+  color: white;
+  text-align: center;
+  overflow: hidden;
+}
+
+.home-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  padding-top: 120px;
+  gap: 12px;
+}
+
+.btn {
+  padding: 12px 24px;
+  font-size: 12px;
+  font-family: 'Press Start 2P', monospace;
+  background: linear-gradient(135deg, #7e30e1, #b983ff);
+  border: 2px solid #e0b3ff;
+  border-radius: 10px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(126, 48, 225, 0.4);
+}
+
+.btn:hover {
+  background: linear-gradient(135deg, #9a42f3, #d1a3ff);
+  box-shadow: 0 6px 20px rgba(126, 48, 225, 0.6);
+  transform: scale(1.05);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #444;
+  border: 2px solid #999;
+  box-shadow: none;
+  transform: none;
+}
+
+.start-btn {
+  font-size: 18px;
+  padding: 16px 32px;
+  margin-top: 20px;
+}
+
+.user-info-card {
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid #e0b3ff;
+  border-radius: 10px;
+  padding: 15px;
+  margin: 10px 0;
+  max-width: 400px;
+}
+
+.username-display {
+  font-size: 16px;
+  color: #FFD700;
+  margin: 5px 0;
+}
+
+.username-prompt {
+  background: rgba(255, 100, 100, 0.2);
+  border: 2px solid #ff6666;
+  border-radius: 8px;
+  padding: 10px;
+  margin: 10px 0;
+}
+
+.register-link {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 8px 16px;
+  background: #e74c3c;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 10px;
+  transition: all 0.3s ease;
+}
+
+.register-link:hover {
+  background: #c0392b;
+  transform: scale(1.05);
+}
+
+.status-message {
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid;
+  border-radius: 8px;
+  padding: 10px;
+  margin: 5px 0;
+  font-size: 10px;
+}
+
+.status-success { 
+  border-color: #27ae60; 
+  color: #27ae60; 
+}
+
+.status-error { 
+  border-color: #e74c3c; 
+  color: #e74c3c; 
+}
+
+.status-info { 
+  border-color: #3498db; 
+  color: #3498db; 
+}
+
+footer {
+  position: fixed;
+  bottom: 10px;
+  width: 100%;
+  text-align: center;
+  font-family: sans-serif;
+  color: white;
+}
+
+.pixel-text {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 18px;
+  color: white;
+  text-shadow: 2px 2px black;
+}
+
+.link-text {
+  text-decoration: none;
+  color: #00eaff;
+}
+
+.link-text:hover {
+  color: #ffcc00;
+}
