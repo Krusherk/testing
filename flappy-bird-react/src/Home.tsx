@@ -15,18 +15,26 @@ export default function Home() {
   const [messageCounter, setMessageCounter] = useState(0);
   const [accountAddress, setAccountAddress] = useState<string>('');
 
+  console.log('Home component rendering...', { authenticated, user, ready });
+
   // Extract wallet address using the proper method from the guide
   useEffect(() => {
     if (authenticated && user && ready) {
-      if (user.linkedAccounts.length > 0) {
+      console.log('User linked accounts:', user.linkedAccounts);
+      if (user.linkedAccounts && user.linkedAccounts.length > 0) {
         // Get the cross app account created using Monad Games ID    
-        const crossAppAccount: CrossAppAccountWithMetadata = user.linkedAccounts.filter(
-          account => account.type === "cross_app" && account.providerApp.id === "cmd8euall0037le0my79qpz42"
-        )[0] as CrossAppAccountWithMetadata;
+        const crossAppAccount = user.linkedAccounts.find(
+          account => account.type === "cross_app" && 
+          account.providerApp && 
+          account.providerApp.id === "cmd8euall0037le0my79qpz42"
+        ) as CrossAppAccountWithMetadata;
+
+        console.log('Cross app account found:', crossAppAccount);
 
         // The first embedded wallet created using Monad Games ID, is the wallet address
-        if (crossAppAccount && crossAppAccount.embeddedWallets.length > 0) {
+        if (crossAppAccount && crossAppAccount.embeddedWallets && crossAppAccount.embeddedWallets.length > 0) {
           setAccountAddress(crossAppAccount.embeddedWallets[0].address);
+          console.log('Account address set:', crossAppAccount.embeddedWallets[0].address);
         }
       }
     }
@@ -76,6 +84,7 @@ export default function Home() {
   };
 
   const handleRegisterUsername = () => {
+    console.log('Register username clicked');
     window.open('https://monadclip.fun/', '_blank');
     showStatusMessage('Please complete registration and refresh this page', 'info');
   };
@@ -122,8 +131,12 @@ export default function Home() {
     }
   }, [error]);
 
+  console.log('About to render JSX');
+
   return (
     <div className="home-container">
+      <h1 style={{ color: 'white' }}>Flappy Dak</h1>
+      
       {!authenticated ? (
         <button onClick={handleLogin} className="btn" id="loginBtn">
           Login with Monad Games ID
@@ -134,7 +147,6 @@ export default function Home() {
         </button>
       )}
 
-      {/* Always show register button */}
       <button 
         onClick={handleRegisterUsername} 
         className="btn"
