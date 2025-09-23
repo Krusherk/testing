@@ -24,7 +24,6 @@ export default function Home() {
   const refreshUsernameCheck = () => {
     if (walletAddress) {
       showStatusMessage('Rechecking username...', 'info');
-      // Force a re-fetch by updating the walletAddress dependency
       window.location.reload();
     }
   };
@@ -39,7 +38,6 @@ export default function Home() {
     setStatusMessages(prev => [...prev, newMessage]);
     setMessageCounter(prev => prev + 1);
 
-    // Remove message after 5 seconds
     setTimeout(() => {
       setStatusMessages(prev => prev.filter(msg => msg.id !== newMessage.id));
     }, 5000);
@@ -79,11 +77,10 @@ export default function Home() {
     }
 
     if (!hasUsername || !monadUser) {
-      showStatusMessage('Please register a username first!', 'error');
+      showStatusMessage('Please register a username first using the button above!', 'error');
       return;
     }
 
-    // Store user data for the game (using sessionStorage in React)
     sessionStorage.setItem("flappy_discord", monadUser?.username || '');
     sessionStorage.setItem("flappy_wallet", walletAddress);
     sessionStorage.setItem("flappy_paid", "true");
@@ -92,9 +89,8 @@ export default function Home() {
     showStatusMessage('Starting game...', 'success');
     
     setTimeout(() => {
-      // Simple navigation - in a real app you'd use React Router
       window.history.pushState({}, '', '/game');
-      window.location.reload(); // Trigger re-render
+      window.location.reload();
     }, 1000);
   };
 
@@ -123,77 +119,89 @@ export default function Home() {
     }
   }, [error]);
 
-  // Debug log
-  useEffect(() => {
-    console.log('Current state:', {
-      authenticated,
-      walletAddress,
-      hasUsername,
-      monadUser,
-      isLoading,
-      error
-    });
-  }, [authenticated, walletAddress, hasUsername, monadUser, isLoading, error]);
-
   const canStartGame = authenticated && walletAddress && hasUsername && monadUser && !isLoading;
 
   return (
     <div className="home-container">
+      {/* Step 1: Login */}
       {!authenticated ? (
-        <button onClick={handleLogin} className="btn" id="loginBtn">
-          Login with Monad Games ID
-        </button>
+        <div style={{ textAlign: 'center' }}>
+          <h3 style={{ color: 'white', marginBottom: '20px' }}>Step 1: Connect Wallet</h3>
+          <button onClick={handleLogin} className="btn" id="loginBtn">
+            Login with Monad Games ID
+          </button>
+        </div>
       ) : (
-        <button onClick={handleLogout} className="btn" id="logoutBtn">
-          Logout
-        </button>
-      )}
-
-      {authenticated && walletAddress && (
-        <div className="user-info-card">
-          <div id="walletAddress">
-            <div style={{ color: '#00eaff' }}>💎 Monad Games ID Connected</div>
-            <div style={{ fontSize: '10px' }}>{formatWalletAddress(walletAddress)}</div>
-          </div>
-          
-          <div id="usernameStatus">
-            {isLoading ? (
-              <div style={{ color: '#3498db' }}>Checking username...</div>
-            ) : hasUsername && monadUser ? (
-              <>
-                <div className="username-display">👤 {monadUser.username}</div>
-                <div style={{ fontSize: '8px', color: '#ccc' }}>ID: {monadUser.id}</div>
-              </>
-            ) : (
-              <div className="username-prompt">
-                <div style={{ color: '#ff6666', marginBottom: '8px' }}>⚠ Username Required</div>
-                <div style={{ fontSize: '8px', marginBottom: '8px' }}>You need a username to save scores and play</div>
-                <a 
-                  href="https://monadclip.fun/register" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="register-link"
-                  onClick={() => showStatusMessage('Please complete username registration and refresh the page', 'info')}
-                >
-                  Register Username
-                </a>
-                <div style={{ fontSize: '8px', color: '#ccc', marginTop: '5px' }}>
-                  After registering, click refresh below
-                </div>
-                <button 
-                  className="btn" 
-                  style={{ fontSize: '8px', padding: '6px 12px', marginTop: '8px' }}
-                  onClick={refreshUsernameCheck}
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'Checking...' : 'Refresh Username'}
-                </button>
-              </div>
-            )}
-          </div>
+        <div style={{ textAlign: 'center' }}>
+          <h3 style={{ color: '#00ff00', marginBottom: '10px' }}>✓ Wallet Connected</h3>
+          <button onClick={handleLogout} className="btn" id="logoutBtn">
+            Logout
+          </button>
         </div>
       )}
 
+      {/* Step 2: Username Registration */}
+      {authenticated && walletAddress && (
+        <div className="user-info-card">
+          <div style={{ color: '#00eaff', marginBottom: '10px' }}>
+            💎 {formatWalletAddress(walletAddress)}
+          </div>
+          
+          {isLoading ? (
+            <div style={{ color: '#3498db' }}>
+              <h4>Step 2: Checking Username...</h4>
+              <div>Please wait...</div>
+            </div>
+          ) : hasUsername && monadUser ? (
+            <div style={{ textAlign: 'center' }}>
+              <h4 style={{ color: '#00ff00' }}>✓ Username Registered</h4>
+              <div className="username-display">👤 {monadUser.username}</div>
+              <div style={{ fontSize: '8px', color: '#ccc' }}>ID: {monadUser.id}</div>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center' }}>
+              <h4 style={{ color: '#ff6666' }}>Step 2: Register Username</h4>
+              <div style={{ fontSize: '10px', marginBottom: '15px', color: '#ccc' }}>
+                You need a username to play and save scores
+              </div>
+              
+              {/* BIG OBVIOUS REGISTER BUTTON */}
+              <a 
+                href="https://monadclip.fun/register" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="btn"
+                style={{
+                  display: 'inline-block',
+                  backgroundColor: '#e74c3c',
+                  fontSize: '14px',
+                  padding: '15px 25px',
+                  marginBottom: '10px',
+                  textDecoration: 'none'
+                }}
+                onClick={() => showStatusMessage('Complete registration and return to refresh', 'info')}
+              >
+                🚀 REGISTER USERNAME
+              </a>
+              
+              <div style={{ fontSize: '8px', color: '#ccc', marginBottom: '10px' }}>
+                ↑ Click above to register, then return and refresh
+              </div>
+              
+              <button 
+                className="btn" 
+                style={{ fontSize: '10px', padding: '8px 15px' }}
+                onClick={refreshUsernameCheck}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Checking...' : '🔄 Refresh Username Check'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Status Messages */}
       <div id="statusMessages">
         {statusMessages.map((msg) => (
           <div key={msg.id} className={`status-message status-${msg.type}`}>
@@ -202,33 +210,46 @@ export default function Home() {
         ))}
       </div>
 
-      <button 
-        id="startBtn" 
-        className="btn start-btn"
-        disabled={!canStartGame}
-        onClick={handleStartGame}
-        style={{
-          backgroundColor: canStartGame ? '#7e30e1' : '#444',
-          cursor: canStartGame ? 'pointer' : 'not-allowed'
-        }}
-      >
-        START GAME
-      </button>
+      {/* Step 3: Start Game */}
+      <div style={{ textAlign: 'center', marginTop: '20px' }}>
+        <h3 style={{ color: canStartGame ? '#00ff00' : '#666' }}>
+          {canStartGame ? '✓ Ready to Play!' : 'Complete Steps Above'}
+        </h3>
+        <button 
+          id="startBtn" 
+          className="btn start-btn"
+          disabled={!canStartGame}
+          onClick={handleStartGame}
+          style={{
+            backgroundColor: canStartGame ? '#7e30e1' : '#444',
+            cursor: canStartGame ? 'pointer' : 'not-allowed',
+            fontSize: '18px',
+            padding: '15px 30px'
+          }}
+        >
+          {canStartGame ? '🎮 START GAME' : '❌ START GAME (Disabled)'}
+        </button>
+      </div>
 
-      {/* Debug info - remove in production */}
+      {/* Debug Panel */}
       <div style={{ 
         position: 'fixed', 
-        bottom: '50px', 
+        bottom: '80px', 
         left: '10px', 
-        fontSize: '8px', 
-        background: 'rgba(0,0,0,0.8)', 
-        padding: '5px',
-        color: '#fff'
+        fontSize: '10px', 
+        background: 'rgba(0,0,0,0.9)', 
+        padding: '10px',
+        color: '#fff',
+        borderRadius: '5px',
+        fontFamily: 'monospace'
       }}>
-        Debug: Auth: {authenticated ? '✓' : '✗'} | 
-        Wallet: {walletAddress ? '✓' : '✗'} | 
-        Username: {hasUsername ? '✓' : '✗'} | 
-        Loading: {isLoading ? '✓' : '✗'}
+        <strong>Debug Info:</strong><br/>
+        Authenticated: {authenticated ? '✅ YES' : '❌ NO'}<br/>
+        Wallet Address: {walletAddress ? '✅ YES' : '❌ NO'}<br/>
+        Has Username: {hasUsername ? '✅ YES' : '❌ NO'}<br/>
+        User Object: {monadUser ? '✅ YES' : '❌ NO'}<br/>
+        Loading: {isLoading ? '⏳ YES' : '✅ NO'}<br/>
+        Error: {error ? '❌ ' + error : '✅ NONE'}
       </div>
 
       <footer>
