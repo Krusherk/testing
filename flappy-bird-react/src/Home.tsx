@@ -134,10 +134,12 @@ export default function Home() {
         </button>
       )}
 
+      {/* Always show register button */}
       <button 
         onClick={handleRegisterUsername} 
         className="btn"
         style={{ backgroundColor: '#e74c3c', marginTop: '10px' }}
+        id="registerBtn"
       >
         Register Username
       </button>
