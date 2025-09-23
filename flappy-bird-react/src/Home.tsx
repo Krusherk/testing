@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
+import { usePrivy, CrossAppAccountWithMetadata } from '@privy-io/react-auth';
 import { useMonadGamesUser } from './useMonadGamesUser';
 import './Home.css';
 
@@ -10,12 +10,29 @@ interface StatusMessage {
 }
 
 export default function Home() {
-  const { login, logout, authenticated, user } = usePrivy();
+  const { login, logout, authenticated, user, ready } = usePrivy();
   const [statusMessages, setStatusMessages] = useState<StatusMessage[]>([]);
   const [messageCounter, setMessageCounter] = useState(0);
+  const [accountAddress, setAccountAddress] = useState<string>('');
 
-  const walletAddress = user?.wallet?.address || '';
-  const { user: monadUser, hasUsername, isLoading, error } = useMonadGamesUser(walletAddress);
+  // Extract wallet address using the proper method from the guide
+  useEffect(() => {
+    if (authenticated && user && ready) {
+      if (user.linkedAccounts.length > 0) {
+        // Get the cross app account created using Monad Games ID    
+        const crossAppAccount: CrossAppAccountWithMetadata = user.linkedAccounts.filter(
+          account => account.type === "cross_app" && account.providerApp.id === "cmd8euall0037le0my79qpz42"
+        )[0] as CrossAppAccountWithMetadata;
+
+        // The first embedded wallet created using Monad Games ID, is the wallet address
+        if (crossAppAccount && crossAppAccount.embeddedWallets.length > 0) {
+          setAccountAddress(crossAppAccount.embeddedWallets[0].address);
+        }
+      }
+    }
+  }, [authenticated, user, ready]);
+
+  const { user: monadUser, hasUsername, isLoading, error } = useMonadGamesUser(accountAddress);
 
   const showStatusMessage = (message: string, type: 'success' | 'error' | 'info') => {
     const newMessage = {
@@ -50,6 +67,7 @@ export default function Home() {
   const handleLogout = async () => {
     try {
       await logout();
+      setAccountAddress('');
       showStatusMessage('Logged out successfully', 'info');
     } catch (error) {
       console.error('Logout failed:', error);
@@ -57,8 +75,13 @@ export default function Home() {
     }
   };
 
+  const handleRegisterUsername = () => {
+    window.open('https://monadclip.fun/', '_blank');
+    showStatusMessage('Please complete registration and refresh this page', 'info');
+  };
+
   const handleStartGame = () => {
-    if (!authenticated || !walletAddress) {
+    if (!authenticated || !accountAddress) {
       showStatusMessage('Please connect your wallet first!', 'error');
       return;
     }
@@ -69,7 +92,7 @@ export default function Home() {
     }
 
     sessionStorage.setItem("flappy_discord", monadUser?.username || '');
-    sessionStorage.setItem("flappy_wallet", walletAddress);
+    sessionStorage.setItem("flappy_wallet", accountAddress);
     sessionStorage.setItem("flappy_paid", "true");
     sessionStorage.setItem("flappy_plays", "999");
 
@@ -81,26 +104,17 @@ export default function Home() {
     }, 1000);
   };
 
-  // Auto-redirect to registration when wallet connects but no username
   useEffect(() => {
-    if (authenticated && walletAddress && !isLoading && !hasUsername && !error) {
-      // Automatically open registration page
-      window.open('https://monadclip.fun/register', '_blank');
-      showStatusMessage('Please complete registration and refresh this page', 'info');
-    }
-  }, [authenticated, walletAddress, isLoading, hasUsername, error]);
-
-  useEffect(() => {
-    if (authenticated && walletAddress) {
+    if (authenticated && accountAddress) {
       showStatusMessage('Successfully connected to Monad Games ID!', 'success');
     }
-  }, [authenticated, walletAddress]);
+  }, [authenticated, accountAddress]);
 
   useEffect(() => {
-    if (walletAddress && !isLoading && hasUsername && monadUser) {
+    if (accountAddress && !isLoading && hasUsername && monadUser) {
       showStatusMessage(`Welcome back, ${monadUser.username}!`, 'success');
     }
-  }, [walletAddress, isLoading, hasUsername, monadUser]);
+  }, [accountAddress, isLoading, hasUsername, monadUser]);
 
   useEffect(() => {
     if (error) {
@@ -120,11 +134,19 @@ export default function Home() {
         </button>
       )}
 
-      {authenticated && walletAddress && (
+      <button 
+        onClick={handleRegisterUsername} 
+        className="btn"
+        style={{ backgroundColor: '#e74c3c', marginTop: '10px' }}
+      >
+        Register Username
+      </button>
+
+      {authenticated && accountAddress && (
         <div className="user-info-card">
           <div id="walletAddress">
             <div style={{ color: '#00eaff' }}>Monad Games ID Connected</div>
-            <div style={{ fontSize: '10px' }}>{formatWalletAddress(walletAddress)}</div>
+            <div style={{ fontSize: '10px' }}>{formatWalletAddress(accountAddress)}</div>
           </div>
           
           <div id="usernameStatus">
@@ -136,24 +158,8 @@ export default function Home() {
                 <div style={{ fontSize: '8px', color: '#ccc' }}>ID: {monadUser.id}</div>
               </>
             ) : (
-              <div className="username-prompt">
-                <div style={{ color: '#ff6666', marginBottom: '8px' }}>Username Required</div>
-                <div style={{ fontSize: '8px', marginBottom: '8px' }}>Registration page should have opened automatically</div>
-                <a 
-                  href="https://monadclip.fun/register" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="register-link"
-                >
-                  Register Username
-                </a>
-                <button 
-                  className="btn" 
-                  style={{ fontSize: '8px', padding: '6px 12px', marginTop: '8px' }}
-                  onClick={() => window.location.reload()}
-                >
-                  Refresh After Registration
-                </button>
+              <div style={{ color: '#ff6666', fontSize: '10px' }}>
+                No username found. Use the Register Username button above.
               </div>
             )}
           </div>
