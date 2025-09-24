@@ -3,11 +3,14 @@ import Leaderboard from './Leaderboard';
 import './Game.css';
 
 export default function Game() {
-  const { gameState, score, highScore, birdTop, pipes, startGame, jump } = useFlappyGame();
+  const { gameState, score, highScore, birdTop, pipes, startGame, beginGameplay, jump } = useFlappyGame();
 
   const handleClick = () => {
     if (gameState === 'Start' || gameState === 'End') {
       startGame();
+    } else if (gameState === 'Ready') {
+      beginGameplay();
+      jump();
     } else if (gameState === 'Play') {
       jump();
     }
@@ -33,7 +36,7 @@ export default function Game() {
 
       {/* Pipes */}
       {pipes.map(pipe => (
-        <div key={`${pipe.id}-top`}>
+        <div key={pipe.id}>
           {/* Top pipe */}
           <div 
             className="pipe_sprite"
@@ -55,11 +58,17 @@ export default function Game() {
         </div>
       ))}
 
-      {/* Game Message */}
+      {/* Game Messages */}
       {gameState === 'Start' && (
         <div className="message messageStyle">
           Press Enter To Start Game
           <p><span style={{ color: 'red' }}>&uarr;</span> ArrowUp to Control</p>
+        </div>
+      )}
+
+      {gameState === 'Ready' && (
+        <div className="message messageStyle">
+          Press <span style={{ color: 'red' }}>ArrowUp</span> to Begin!
         </div>
       )}
 
