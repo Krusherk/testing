@@ -15,13 +15,12 @@
 }
 
 .background {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   height: 100vh;
   width: 100vw;
-  background: url('/images/background-img.png') no-repeat center center;
-  background-size: cover;
+  background: url('/images/background-img.png') center center / cover no-repeat;
   z-index: -1;
 }
 
@@ -174,7 +173,7 @@
 }
 
 .leaderboard-list li.top-3 {
-  color: #cd7f32; /* bronze */
+  color: #cd7f32;
 }
 
 .leaderboard-list .leaderboard-player {
