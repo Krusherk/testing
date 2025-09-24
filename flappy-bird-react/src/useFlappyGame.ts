@@ -19,13 +19,13 @@ export const useFlappyGame = () => {
   
   const birdVelocity = useRef(0);
   const frameCount = useRef(0);
-  const gameLoop = useRef<number>(0);
+  const gameLoop = useRef<number>();
   const pipeIdCounter = useRef(0);
 
   // Game constants
-  const GRAVITY = 0.5;
-  const JUMP_FORCE = -7.6;
-  const MOVE_SPEED = 3;
+  const GRAVITY = 0.3; // Reduced from 0.5
+  const JUMP_FORCE = -6; // Reduced from -7.6
+  const MOVE_SPEED = 2; // Reduced from 3
   const PIPE_GAP = 35;
 
   // Load high score on mount
@@ -129,8 +129,8 @@ export const useFlappyGame = () => {
         return newTop;
       });
 
-      // Generate pipes
-      if (frameCount.current % 115 === 0) {
+      // Generate pipes more frequently
+      if (frameCount.current % 90 === 0) { // Changed from 115 to 90
         const pipeTopHeight = Math.floor(Math.random() * 43) + 8;
         const newPipe: Pipe = {
           id: pipeIdCounter.current++,
