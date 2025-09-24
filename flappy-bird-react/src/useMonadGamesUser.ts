@@ -39,6 +39,7 @@ export function useMonadGamesUser(
       setIsLoading(true);
       setError(null);
       try {
+        console.log('Fetching username for wallet:', walletAddress);
         const response = await fetch(
           `https://monadclip.fun/api/check-wallet?wallet=${walletAddress}`
         );
@@ -46,9 +47,17 @@ export function useMonadGamesUser(
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data: UserResponse = await response.json();
+        console.log('API response:', data);
+        
         setHasUsername(data.hasUsername);
         setUser(data.user || null);
+        
+        console.log('Updated state:', { 
+          hasUsername: data.hasUsername, 
+          user: data.user 
+        });
       } catch (err) {
+        console.error('Error fetching user data:', err);
         setError(err instanceof Error ? err.message : "An error occurred");
         setHasUsername(false);
         setUser(null);
