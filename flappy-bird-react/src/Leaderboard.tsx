@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { loadLeaderboard, LeaderboardEntry } from './firebase';
 
 interface LeaderboardProps {
   currentScore: number;
@@ -6,25 +7,39 @@ interface LeaderboardProps {
 
 export default function Leaderboard({ currentScore }: LeaderboardProps) {
   const [activeTab, setActiveTab] = useState<'rank' | 'score'>('rank');
+  const [scores, setScores] = useState<LeaderboardEntry[]>([]);
+  const [currentUserEntry, setCurrentUserEntry] = useState<LeaderboardEntry | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // For now, we'll show mock data since Firebase is removed
-  // You can implement your own leaderboard logic here
-  const mockLeaderboard = [
-    { rank: 1, name: "Player1", score: 150 },
-    { rank: 2, name: "Player2", score: 142 },
-    { rank: 3, name: "Player3", score: 138 },
-    { rank: 4, name: "Player4", score: 125 },
-    { rank: 5, name: "Player5", score: 119 },
-  ];
+  useEffect(() => {
+    const handleLeaderboardUpdate = (newScores: LeaderboardEntry[], userEntry: LeaderboardEntry | null) => {
+      setScores(newScores);
+      setCurrentUserEntry(userEntry);
+      setLoading(false);
+    };
+
+    loadLeaderboard(handleLeaderboardUpdate);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="leaderboard">
+        <div className="leaderboard-header">
+          <h2>LEADERBOARD</h2>
+          <p className="subtext">Loading scores...</p>
+        </div>
+      </div>
+    );
+  }
 
   const currentUser = sessionStorage.getItem("flappy_discord") || "You";
-  const currentWallet = sessionStorage.getItem("flappy_wallet");
+  const isInTop10 = scores.some(s => s.wallet?.toLowerCase() === sessionStorage.getItem("flappy_wallet")?.toLowerCase());
 
   return (
     <div className="leaderboard">
       <div className="leaderboard-header">
         <h2>LEADERBOARD</h2>
-        <p className="subtext">Only top players get rewards</p>
+        <p className="subtext">Live scores from all players</p>
         <div className="leaderboard-toggle">
           <button 
             className={`toggle-btn ${activeTab === 'rank' ? 'active' : ''}`}
@@ -42,28 +57,50 @@ export default function Leaderboard({ currentScore }: LeaderboardProps) {
       </div>
       
       <ul className="leaderboard-list">
+        {/* Show current game score if playing */}
         {currentScore > 0 && (
-          <li style={{ color: '#FFD700' }}>
+          <li style={{ color: '#FFD700', borderBottom: '2px solid #FFD700' }}>
             <span className="rank">Current:</span>
             <span className="leaderboard-player">{currentUser}</span>
             <span className="leaderboard-score">{currentScore}</span>
           </li>
         )}
+
+        {/* Show personal best if not in top 10 */}
+        {currentUserEntry && !isInTop10 && (
+          <li style={{ color: '#00ff00' }}>
+            <span className="rank">Your Best:</span>
+            <span className="leaderboard-player">{currentUserEntry.name}</span>
+            <span className="leaderboard-score">{currentUserEntry.score}</span>
+          </li>
+        )}
         
-        {mockLeaderboard.map((entry) => (
+        {/* Top 10 leaderboard */}
+        {scores.map((entry, index) => (
           <li 
-            key={entry.rank}
+            key={entry.wallet}
             className={
-              entry.rank === 1 ? 'top-1' : 
-              entry.rank === 2 ? 'top-2' : 
-              entry.rank === 3 ? 'top-3' : ''
+              index === 0 ? 'top-1' : 
+              index === 1 ? 'top-2' : 
+              index === 2 ? 'top-3' : ''
             }
+            style={{
+              color: entry.wallet?.toLowerCase() === sessionStorage.getItem("flappy_wallet")?.toLowerCase() 
+                ? '#FFD700' 
+                : undefined
+            }}
           >
-            <span className="rank">#{entry.rank}</span>
+            <span className="rank">#{index + 1}</span>
             <span className="leaderboard-player">{entry.name}</span>
             <span className="leaderboard-score">{entry.score}</span>
           </li>
         ))}
+
+        {scores.length === 0 && (
+          <li>
+            <span>No scores yet. Be the first!</span>
+          </li>
+        )}
       </ul>
     </div>
   );
