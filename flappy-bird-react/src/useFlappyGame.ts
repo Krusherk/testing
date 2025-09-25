@@ -23,11 +23,12 @@ export const useFlappyGame = () => {
   const gameLoop = useRef<number>();
   const pipeIdCounter = useRef(0);
 
-  // Game constants - HALF SPEED (x2 slower)
-  const GRAVITY = 0.075;    // Half of 0.15 - very gentle fall 
-  const JUMP_FORCE = -1.6;  // Half of -3.2 - soft jump
-  const MOVE_SPEED = 0.6;   // Half of 1.2 - very slow pipes
-  const PIPE_GAP = 30;      // Keep gap size
+  // ✅ Tuned constants (closer to your old script)
+  const GRAVITY = 0.22;     // gentle fall
+  const JUMP_FORCE = -4.8;  // soft jump
+  const MOVE_SPEED = 1.4;   // pipe speed
+  const PIPE_GAP = 35;      // same as old
+  const PIPE_INTERVAL = 110; // frames between pipes
 
   // Load high score on mount
   useEffect(() => {
@@ -79,7 +80,7 @@ export const useFlappyGame = () => {
     if (gameState === 'Play') {
       birdVelocity.current = JUMP_FORCE;
     }
-  }, [gameState, JUMP_FORCE]);
+  }, [gameState]);
 
   const startGame = useCallback(() => {
     setGameState('Ready');
@@ -135,8 +136,8 @@ export const useFlappyGame = () => {
         return newTop;
       });
 
-      // Generate pipes - Keep your close spacing
-      if (frameCount.current % 35 === 0) {
+      // Generate pipes
+      if (frameCount.current % PIPE_INTERVAL === 0) {
         const pipeTopHeight = Math.floor(Math.random() * 43) + 8;
         const newPipe: Pipe = {
           id: pipeIdCounter.current++,
@@ -159,18 +160,17 @@ export const useFlappyGame = () => {
               return false;
             }
             
-            // Check collision
-            const birdLeft = 30; // vw units
-            const birdRight = 35; // vw units  
+            // Check collision (more accurate)
+            const birdLeft = 30; 
+            const birdRight = birdLeft + 5;  
             const birdTopPos = birdTop;
-            const birdBottom = birdTop + 10; // bird height in vh
+            const birdBottom = birdTop + 10; 
             
             const pipeLeft = pipe.left;
-            const pipeRight = pipe.left + 6; // pipe width in vw
+            const pipeRight = pipe.left + 6; 
             
             if (birdRight > pipeLeft && birdLeft < pipeRight) {
-              // Bird is horizontally aligned with pipe
-              if (birdTopPos < pipe.topHeight + 70 || birdBottom > pipe.bottomTop) {
+              if (birdTopPos <= pipe.topHeight + 70 || birdBottom >= pipe.bottomTop) {
                 endGame();
                 return false;
               }
@@ -197,7 +197,7 @@ export const useFlappyGame = () => {
         cancelAnimationFrame(gameLoop.current);
       }
     };
-  }, [gameState, birdTop, endGame, GRAVITY, MOVE_SPEED, PIPE_GAP]);
+  }, [gameState, birdTop, endGame]);
 
   // Keyboard controls
   useEffect(() => {
