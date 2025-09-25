@@ -23,11 +23,11 @@ export const useFlappyGame = () => {
   const gameLoop = useRef<number>();
   const pipeIdCounter = useRef(0);
 
-  // Game constants - Fixed for proper gameplay
-  const GRAVITY = 0.25;     // Slower fall 
-  const JUMP_FORCE = -4.5;  // Moderate jump
-  const MOVE_SPEED = 1.5;   // Slower pipe movement
-  const PIPE_GAP = 30;      // Bigger gap so bird can actually pass through
+  // Game constants - MUCH SLOWER
+  const GRAVITY = 0.15;     // Very slow fall 
+  const JUMP_FORCE = -3.2;  // Gentle jump
+  const MOVE_SPEED = 1.2;   // Very slow pipe movement
+  const PIPE_GAP = 30;      // Good gap size
 
   // Load high score on mount
   useEffect(() => {
