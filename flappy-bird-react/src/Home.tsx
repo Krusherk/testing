@@ -135,7 +135,7 @@ export default function Home() {
 
   return (
     <div className="home-container">
-      <h1 style={{ color: 'white' }}>Flappy Dak</h1>
+      <h1 style={{ color: 'white' }}></h1>
       
       {!authenticated ? (
         <button onClick={handleLogin} className="btn" id="loginBtn">
