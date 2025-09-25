@@ -3,16 +3,11 @@ import Leaderboard from './Leaderboard';
 import './Game.css';
 
 export default function Game() {
-  const { gameState, score, highScore, birdTop, pipes, startGame, beginGameplay, jump } = useFlappyGame();
+  const { gameState, score, birdRef, resetGame } = useFlappyGame();
 
   const handleClick = () => {
     if (gameState === 'Start' || gameState === 'End') {
-      startGame();
-    } else if (gameState === 'Ready') {
-      beginGameplay();
-      jump();
-    } else if (gameState === 'Play') {
-      jump();
+      resetGame();
     }
   };
 
@@ -23,40 +18,17 @@ export default function Game() {
       
       {/* Bird */}
       <img 
+        ref={birdRef}
         src="/images/Bird-2.svg" 
         alt="bird-img" 
         className="bird" 
         style={{
-          top: `${birdTop}vh`,
-          display: gameState === 'End' ? 'none' : 'block'
+          top: '40vh',
+          display: 'block'
         }}
         width="130"
         height="100"
       />
-
-      {/* Pipes */}
-      {pipes.map(pipe => (
-        <div key={pipe.id}>
-          {/* Top pipe */}
-          <div 
-            className="pipe_sprite"
-            style={{
-              left: `${pipe.left}vw`,
-              top: `${pipe.topHeight}vh`,
-              height: '60vh'
-            }}
-          />
-          {/* Bottom pipe */}
-          <div 
-            className="pipe_sprite"
-            style={{
-              left: `${pipe.left}vw`,
-              top: `${pipe.bottomTop}vh`,
-              height: '60vh'
-            }}
-          />
-        </div>
-      ))}
 
       {/* Game Messages */}
       {gameState === 'Start' && (

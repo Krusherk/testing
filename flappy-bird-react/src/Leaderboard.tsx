@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { loadLeaderboard, LeaderboardEntry } from './firebase';
+import { loadLeaderboard, type LeaderboardEntry } from './firebase';
 
 interface LeaderboardProps {
   currentScore: number;
@@ -32,14 +32,14 @@ export default function Leaderboard({ currentScore }: LeaderboardProps) {
     );
   }
 
-  const currentUser = sessionStorage.getItem("flappy_discord") || "You";
-  const isInTop10 = scores.some(s => s.wallet?.toLowerCase() === sessionStorage.getItem("flappy_wallet")?.toLowerCase());
+  const myWallet = sessionStorage.getItem("flappy_wallet")?.toLowerCase();
+  const isInTop10 = scores.some(s => s.wallet?.toLowerCase() === myWallet);
 
   return (
     <div className="leaderboard">
       <div className="leaderboard-header">
         <h2>LEADERBOARD</h2>
-        <p className="subtext">Live scores from all players</p>
+        <p className="subtext">Live Monad Games ID players</p>
         <div className="leaderboard-toggle">
           <button 
             className={`toggle-btn ${activeTab === 'rank' ? 'active' : ''}`}
@@ -61,7 +61,7 @@ export default function Leaderboard({ currentScore }: LeaderboardProps) {
         {currentScore > 0 && (
           <li style={{ color: '#FFD700', borderBottom: '2px solid #FFD700' }}>
             <span className="rank">Current:</span>
-            <span className="leaderboard-player">{currentUser}</span>
+            <span className="leaderboard-player">{currentUserEntry?.username || 'You'}</span>
             <span className="leaderboard-score">{currentScore}</span>
           </li>
         )}
@@ -70,7 +70,7 @@ export default function Leaderboard({ currentScore }: LeaderboardProps) {
         {currentUserEntry && !isInTop10 && (
           <li style={{ color: '#00ff00' }}>
             <span className="rank">Your Best:</span>
-            <span className="leaderboard-player">{currentUserEntry.name}</span>
+            <span className="leaderboard-player">{currentUserEntry.username}</span>
             <span className="leaderboard-score">{currentUserEntry.score}</span>
           </li>
         )}
@@ -85,13 +85,13 @@ export default function Leaderboard({ currentScore }: LeaderboardProps) {
               index === 2 ? 'top-3' : ''
             }
             style={{
-              color: entry.wallet?.toLowerCase() === sessionStorage.getItem("flappy_wallet")?.toLowerCase() 
+              color: entry.wallet?.toLowerCase() === myWallet
                 ? '#FFD700' 
                 : undefined
             }}
           >
             <span className="rank">#{index + 1}</span>
-            <span className="leaderboard-player">{entry.name}</span>
+            <span className="leaderboard-player">{entry.username}</span>
             <span className="leaderboard-score">{entry.score}</span>
           </li>
         ))}

@@ -1,35 +1,26 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { saveScore } from './firebase';
 
-interface Pipe {
-  id: number;
-  left: number;
-  topHeight: number;
-  bottomTop: number;
-  scored: boolean;
-}
-
 type GameState = 'Start' | 'Ready' | 'Play' | 'End';
 
 export const useFlappyGame = () => {
   const [gameState, setGameState] = useState<GameState>('Start');
   const [score, setScore] = useState(0);
-  const [birdTop, setBirdTop] = useState(40); // vh units
-  const [pipes, setPipes] = useState<Pipe[]>([]);
+  const [birdTop, setBirdTop] = useState(40);
   const [highScore, setHighScore] = useState(0);
   
-  const birdVelocity = useRef(0);
+  const birdRef = useRef<HTMLImageElement>(null);
+  const birdDy = useRef(0);
   const frameCount = useRef(0);
   const gameLoop = useRef<number>();
-  const pipeIdCounter = useRef(0);
+  const pipes = useRef<HTMLDivElement[]>([]);
+  
+  // Game constants matching your original
+  const gravity = 0.5;
+  const moveSpeed = 3;
+  const pipeGap = 35;
 
-  // Game constants - MUCH SLOWER
-  const GRAVITY = 0.2;
-  const JUMP_FORCE = -5;
-  const MOVE_SPEED = 1.5;
-  const PIPE_GAP = 35;
-
-  // Load high score on mount
+  // Load high score
   useEffect(() => {
     const saved = sessionStorage.getItem("flappy_highscore");
     if (saved) {
@@ -37,7 +28,7 @@ export const useFlappyGame = () => {
     }
   }, []);
 
-  // Check payment status on mount
+  // Check payment status
   useEffect(() => {
     const paid = sessionStorage.getItem("flappy_paid") === "true";
     let plays = parseInt(sessionStorage.getItem("flappy_plays") || "0");
@@ -75,29 +66,118 @@ export const useFlappyGame = () => {
     }
   }, []);
 
-  const jump = useCallback(() => {
-    if (gameState === 'Play') {
-      birdVelocity.current = JUMP_FORCE;
-    }
-  }, [gameState]);
-
-  const startGame = useCallback(() => {
+  const resetGame = useCallback(() => {
+    // Clean up existing pipes
+    pipes.current.forEach(pipe => pipe.remove());
+    pipes.current = [];
+    
+    // Reset game state
     setGameState('Ready');
     setScore(0);
     setBirdTop(40);
-    setPipes([]);
-    birdVelocity.current = 0;
+    birdDy.current = 0;
     frameCount.current = 0;
-    pipeIdCounter.current = 0;
+    
+    if (birdRef.current) {
+      birdRef.current.style.display = 'block';
+    }
   }, []);
 
-  const beginGameplay = useCallback(() => {
+  const startGameLoop = useCallback(() => {
     setGameState('Play');
-  }, []);
+    
+    const runGameLoop = () => {
+      if (gameState !== 'Play') return;
+
+      // Bird physics - exactly like your original
+      birdDy.current += gravity;
+      
+      if (birdRef.current) {
+        const currentTop = parseFloat(birdRef.current.style.top || '40vh');
+        const newTop = currentTop + birdDy.current;
+        
+        // Check boundaries
+        if (newTop <= 0 || newTop >= 90) {
+          endGame();
+          return;
+        }
+        
+        birdRef.current.style.top = newTop + 'vh';
+        setBirdTop(newTop);
+      }
+
+      // Pipe generation - exactly like your original
+      if (frameCount.current % 90 === 0) { // Closer pipes than your 115
+        const pipePos = Math.floor(Math.random() * 43) + 8;
+
+        // Top pipe
+        const pipeTop = document.createElement('div');
+        pipeTop.className = 'pipe_sprite';
+        pipeTop.style.top = (pipePos - 70) + 'vh';
+        pipeTop.style.left = '100vw';
+        pipeTop.style.height = '60vh';
+
+        // Bottom pipe  
+        const pipeBottom = document.createElement('div');
+        pipeBottom.className = 'pipe_sprite';
+        pipeBottom.style.top = (pipePos + pipeGap) + 'vh';
+        pipeBottom.style.left = '100vw';
+        pipeBottom.style.height = '60vh';
+        (pipeBottom as any).increase_score = true;
+
+        document.body.appendChild(pipeTop);
+        document.body.appendChild(pipeBottom);
+        pipes.current.push(pipeTop, pipeBottom);
+      }
+
+      // Pipe movement and collision - exactly like your original
+      pipes.current = pipes.current.filter(pipe => {
+        const pipeRect = pipe.getBoundingClientRect();
+        const birdProps = birdRef.current?.getBoundingClientRect();
+
+        if (pipeRect.right <= 0) {
+          pipe.remove();
+          return false;
+        }
+
+        pipe.style.left = (pipeRect.left - moveSpeed) + 'px';
+
+        // Score increase
+        if ((pipe as any).increase_score && birdProps && pipeRect.right < birdProps.left) {
+          setScore(prev => {
+            const newScore = prev + 1;
+            return newScore;
+          });
+          (pipe as any).increase_score = false;
+        }
+
+        // Collision detection
+        if (birdProps && 
+            birdProps.left < pipeRect.left + pipeRect.width &&
+            birdProps.left + birdProps.width > pipeRect.left &&
+            birdProps.top < pipeRect.top + pipeRect.height &&
+            birdProps.top + birdProps.height > pipeRect.top) {
+          endGame();
+          return false;
+        }
+
+        return true;
+      });
+
+      frameCount.current++;
+      gameLoop.current = requestAnimationFrame(runGameLoop);
+    };
+
+    gameLoop.current = requestAnimationFrame(runGameLoop);
+  }, [gameState]);
 
   const endGame = useCallback(() => {
     setGameState('End');
     
+    if (birdRef.current) {
+      birdRef.current.style.display = 'none';
+    }
+
     // Save score to Firebase
     if (score > 0) {
       saveScore(score);
@@ -109,140 +189,72 @@ export const useFlappyGame = () => {
       sessionStorage.setItem("flappy_highscore", score.toString());
     }
 
+    // Clean up game loop
+    if (gameLoop.current) {
+      cancelAnimationFrame(gameLoop.current);
+    }
+
     deductPlay();
   }, [score, highScore, deductPlay]);
 
-  const resetGame = useCallback(() => {
-    startGame();
-  }, [startGame]);
+  const jump = useCallback(() => {
+    if (gameState === 'Play') {
+      birdDy.current = -7.6; // Exact same as your original
+    }
+  }, [gameState]);
 
-  // Main game loop
-  useEffect(() => {
-    if (gameState !== 'Play') return;
-
-    const runGameLoop = () => {
-      // Update bird physics
-      birdVelocity.current += GRAVITY;
-      setBirdTop(prev => {
-        const newTop = prev + birdVelocity.current;
-        
-        if (newTop <= 0 || newTop >= 90) {
-          endGame();
-          return prev;
-        }
-        
-        return newTop;
-      });
-
-      // Generate pipes more frequently
-      if (frameCount.current % 80 === 0) {
-        const pipeTopHeight = Math.floor(Math.random() * 43) + 8;
-        const newPipe: Pipe = {
-          id: pipeIdCounter.current++,
-          left: 100,
-          topHeight: pipeTopHeight - 70,
-          bottomTop: pipeTopHeight + PIPE_GAP,
-          scored: false
-        };
-        
-        setPipes(prev => [...prev, newPipe]);
-      }
-
-      // Update pipes
-      setPipes(prev => {
-        return prev
-          .map(pipe => ({ ...pipe, left: pipe.left - MOVE_SPEED }))
-          .filter(pipe => {
-            if (pipe.left < -10) {
-              return false;
-            }
-            
-            const birdLeft = 30;
-            const birdRight = 35;
-            const birdTopPos = birdTop;
-            const birdBottom = birdTop + 10;
-            
-            const pipeLeft = pipe.left;
-            const pipeRight = pipe.left + 6;
-            
-            if (birdRight > pipeLeft && birdLeft < pipeRight) {
-              if (birdTopPos < pipe.topHeight + 70 || birdBottom > pipe.bottomTop) {
-                endGame();
-                return false;
-              }
-            }
-            
-            if (!pipe.scored && pipe.left + 6 < birdLeft) {
-              pipe.scored = true;
-              setScore(prev => prev + 1);
-            }
-            
-            return true;
-          });
-      });
-
-      frameCount.current++;
-      gameLoop.current = requestAnimationFrame(runGameLoop);
-    };
-
-    gameLoop.current = requestAnimationFrame(runGameLoop);
-
-    return () => {
-      if (gameLoop.current) {
-        cancelAnimationFrame(gameLoop.current);
-      }
-    };
-  }, [gameState, birdTop, endGame]);
-
-  // Keyboard controls
+  // Keyboard controls - exactly like your original
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        if (gameState === 'Start' || gameState === 'End') {
-          startGame();
-        }
+      if (e.key === 'Enter' && gameState !== 'Play') {
+        resetGame();
       }
-      
-      if ((e.key === 'ArrowUp' || e.key === ' ')) {
-        e.preventDefault();
-        if (gameState === 'Ready') {
-          beginGameplay();
-          jump();
-        } else if (gameState === 'Play') {
-          jump();
-        }
+      if ((e.key === 'ArrowUp' || e.key === ' ') && gameState === 'Ready') {
+        startGameLoop();
+        jump();
+      }
+      if ((e.key === 'ArrowUp' || e.key === ' ') && gameState === 'Play') {
+        jump();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameState, jump, startGame, beginGameplay]);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [gameState, resetGame, startGameLoop, jump]);
 
-  // Touch controls
+  // Touch controls - exactly like your original
   useEffect(() => {
     const handleTouch = () => {
       if (gameState === 'Start') {
-        startGame();
+        resetGame();
       } else if (gameState === 'Ready') {
-        beginGameplay();
+        startGameLoop();
         jump();
       } else if (gameState === 'Play') {
         jump();
       }
     };
 
-    window.addEventListener('touchstart', handleTouch);
-    return () => window.removeEventListener('touchstart', handleTouch);
-  }, [gameState, jump, startGame, beginGameplay]);
+    document.addEventListener('touchstart', handleTouch);
+    return () => document.removeEventListener('touchstart', handleTouch);
+  }, [gameState, resetGame, startGameLoop, jump]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (gameLoop.current) {
+        cancelAnimationFrame(gameLoop.current);
+      }
+      pipes.current.forEach(pipe => pipe.remove());
+    };
+  }, []);
 
   return {
     gameState,
     score,
     highScore,
     birdTop,
-    pipes,
-    startGame,
-    beginGameplay,
-    jump
+    birdRef,
+    resetGame
   };
 };
