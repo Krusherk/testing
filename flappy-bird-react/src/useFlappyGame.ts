@@ -23,11 +23,11 @@ export const useFlappyGame = () => {
   const gameLoop = useRef<number>();
   const pipeIdCounter = useRef(0);
 
-  // 🔧 Adjusted constants
-const GRAVITY = 0.18;     // slower fall per frame
-const JUMP_FORCE = -3.8;  // softer jump
-const MOVE_SPEED = 1.8;   // pipes move slower
-const PIPE_GAP = 10;      // keep gap manageable
+  // Game constants - Fixed for proper gameplay
+  const GRAVITY = 0.25;     // Slower fall 
+  const JUMP_FORCE = -4.5;  // Moderate jump
+  const MOVE_SPEED = 1.5;   // Slower pipe movement
+  const PIPE_GAP = 30;      // Bigger gap so bird can actually pass through
 
   // Load high score on mount
   useEffect(() => {
@@ -135,7 +135,7 @@ const PIPE_GAP = 10;      // keep gap manageable
         return newTop;
       });
 
-      // Generate pipes (closer together)
+      // Generate pipes - Keep your close spacing
       if (frameCount.current % 35 === 0) {
         const pipeTopHeight = Math.floor(Math.random() * 43) + 8;
         const newPipe: Pipe = {
