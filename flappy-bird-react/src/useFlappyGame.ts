@@ -23,11 +23,11 @@ export const useFlappyGame = () => {
   const gameLoop = useRef<number>();
   const pipeIdCounter = useRef(0);
 
-  // Game constants - EXACT match to your original
-  const GRAVITY = 0.5;
-  const JUMP_FORCE = -7.6;
-  const MOVE_SPEED = 3;
-  const PIPE_GAP = 35;
+  // 🔧 Adjusted constants
+  const GRAVITY = 0.25;       // slower fall
+  const JUMP_FORCE = -5.5;    // gentler jump
+  const MOVE_SPEED = 2.2;     // slower pipe movement
+  const PIPE_GAP = 32;        // slightly smaller gap
 
   // Load high score on mount
   useEffect(() => {
@@ -135,8 +135,8 @@ export const useFlappyGame = () => {
         return newTop;
       });
 
-      // Generate pipes - MUCH closer (like 1 inch apart on screen)
-      if (frameCount.current % 50 === 0) {
+      // Generate pipes (closer together)
+      if (frameCount.current % 35 === 0) {
         const pipeTopHeight = Math.floor(Math.random() * 43) + 8;
         const newPipe: Pipe = {
           id: pipeIdCounter.current++,
