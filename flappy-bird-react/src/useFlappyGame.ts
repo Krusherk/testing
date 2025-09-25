@@ -23,11 +23,11 @@ export const useFlappyGame = () => {
   const gameLoop = useRef<number>();
   const pipeIdCounter = useRef(0);
 
-  // Game constants - MUCH SLOWER
-  const GRAVITY = 0.15;     // Very slow fall 
-  const JUMP_FORCE = -3.2;  // Gentle jump
-  const MOVE_SPEED = 1.2;   // Very slow pipe movement
-  const PIPE_GAP = 30;      // Good gap size
+  // Game constants - HALF SPEED (x2 slower)
+  const GRAVITY = 0.075;    // Half of 0.15 - very gentle fall 
+  const JUMP_FORCE = -1.6;  // Half of -3.2 - soft jump
+  const MOVE_SPEED = 0.6;   // Half of 1.2 - very slow pipes
+  const PIPE_GAP = 30;      // Keep gap size
 
   // Load high score on mount
   useEffect(() => {
