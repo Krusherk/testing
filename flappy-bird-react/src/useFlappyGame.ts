@@ -23,12 +23,11 @@ export const useFlappyGame = () => {
   const gameLoop = useRef<number>();
   const pipeIdCounter = useRef(0);
 
-  // Fixed physics - small jump, minimal gravity
-  const GRAVITY = 0.15;    // Very light gravity
-  const JUMP_FORCE = -3;   // Small jump (about 1 inch)
-  const MOVE_SPEED = 2;
-  const PIPE_GAP = 35;
-
+const GRAVITY = 0.08;     // Reduced from 0.15 - much slower fall
+const JUMP_FORCE = -2.2;  // Reduced from -3 - exactly half inch jump
+const MOVE_SPEED = 2;     // Keep pipe speed the same
+const PIPE_GAP = 35;      // Keep gap the same
+  
   useEffect(() => {
     const saved = sessionStorage.getItem("flappy_highscore");
     if (saved) {
