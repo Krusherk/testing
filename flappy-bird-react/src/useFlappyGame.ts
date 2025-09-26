@@ -23,9 +23,9 @@ export const useFlappyGame = () => {
   const gameLoop = useRef<number>();
   const pipeIdCounter = useRef(0);
 
-  // Simple, working constants
-  const GRAVITY = 0.4;
-  const JUMP_FORCE = -8;
+  // Fixed physics - small jump, minimal gravity
+  const GRAVITY = 0.15;    // Very light gravity
+  const JUMP_FORCE = -3;   // Small jump (about 1 inch)
   const MOVE_SPEED = 2;
   const PIPE_GAP = 35;
 
