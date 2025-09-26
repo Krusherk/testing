@@ -6,6 +6,7 @@ type GameState = 'Start' | 'Ready' | 'Play' | 'End';
 export const useFlappyGame = () => {
   const [gameState, setGameState] = useState<GameState>('Start');
   const [score, setScore] = useState(0);
+  const [birdTop, setBirdTop] = useState(40); // Track bird position in state
   const [highScore, setHighScore] = useState(0);
   
   const birdRef = useRef<HTMLImageElement>(null);
@@ -77,6 +78,7 @@ export const useFlappyGame = () => {
     
     birdDy.current = 0;
     setScore(0);
+    setBirdTop(40); // Reset bird position in state too
     frameCount.current = 0;
     setGameState('Ready');
   }, []);
@@ -92,15 +94,21 @@ export const useFlappyGame = () => {
 
       // Light gravity - bird falls gently
       birdDy.current += gravity;
-      const newTop = bird.offsetTop + birdDy.current;
+      const newTopPixels = bird.offsetTop + birdDy.current;
       
       // Boundary check
-      if (newTop <= 0 || newTop + bird.clientHeight >= backgroundRect.current.height) {
+      if (newTopPixels <= 0 || newTopPixels + bird.clientHeight >= backgroundRect.current.height) {
         endGame();
         return;
       }
       
-      bird.style.top = newTop + 'px';
+      // Update DOM element
+      bird.style.top = newTopPixels + 'px';
+      
+      // Update React state for rendering (convert pixels to vh)
+      const newTopVh = (newTopPixels / window.innerHeight) * 100;
+      setBirdTop(newTopVh);
+      
       const birdProps = bird.getBoundingClientRect();
 
       // Pipe generation - every 0.5 seconds (30 frames at 60fps)
@@ -215,7 +223,7 @@ export const useFlappyGame = () => {
     gameState,
     score,
     highScore,
-    birdTop: birdRef.current ? birdRef.current.offsetTop * 100 / window.innerHeight : 40, // Convert to vh
+    birdTop, // Now properly tracked in state
     pipes: [], // Empty array since we use DOM manipulation
     birdRef,
     startGame: resetGame,
