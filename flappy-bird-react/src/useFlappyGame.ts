@@ -23,11 +23,12 @@ export const useFlappyGame = () => {
   const gameLoop = useRef<number>();
   const pipeIdCounter = useRef(0);
 
-const GRAVITY = 0.08;     // Reduced from 0.15 - much slower fall
-const JUMP_FORCE = -2.2;  // Reduced from -3 - exactly half inch jump
-const MOVE_SPEED = 2;     // Keep pipe speed the same
-const PIPE_GAP = 35;      // Keep gap the same
-  
+  // Exact values from your original JavaScript
+  const GRAVITY = 0.5;
+  const JUMP_FORCE = -7.6;
+  const MOVE_SPEED = 3;
+  const PIPE_GAP = 35;
+
   useEffect(() => {
     const saved = sessionStorage.getItem("flappy_highscore");
     if (saved) {
@@ -111,17 +112,17 @@ const PIPE_GAP = 35;      // Keep gap the same
     startGame();
   }, [startGame]);
 
-  // Simple game loop
+  // Simple game loop matching your original JavaScript exactly
   useEffect(() => {
     if (gameState !== 'Play') return;
 
     const runGameLoop = () => {
-      // Bird physics - simple gravity
+      // Exact gravity logic from your original
       birdVelocity.current += GRAVITY;
       setBirdTop(prev => {
         const newTop = prev + birdVelocity.current;
         
-        // Boundary check
+        // Boundary check (your original used pixel heights, converted to vh)
         if (newTop <= 0 || newTop >= 85) {
           endGame();
           return prev;
@@ -130,40 +131,52 @@ const PIPE_GAP = 35;      // Keep gap the same
         return newTop;
       });
 
-      // Generate new pipes
-      if (frameCount.current % 90 === 0) {
-        const pipeTopHeight = Math.floor(Math.random() * 50) + 10;
+      // Pipe generation - exact timing from your original
+      if (frameCount.current % 115 === 0) {
+        const pipePos = Math.floor(Math.random() * 43) + 8;
         const newPipe: Pipe = {
           id: pipeIdCounter.current++,
           left: 100,
-          topHeight: pipeTopHeight - 70,
-          bottomTop: pipeTopHeight + PIPE_GAP,
+          topHeight: pipePos - 70,
+          bottomTop: pipePos + PIPE_GAP,
           scored: false
         };
         
         setPipes(prev => [...prev, newPipe]);
       }
 
-      // Move and update pipes
+      // Pipe movement and collision - exact logic from your original
       setPipes(prev => {
         return prev
           .map(pipe => ({ ...pipe, left: pipe.left - MOVE_SPEED }))
           .filter(pipe => {
-            // Remove off-screen pipes
             if (pipe.left < -10) {
               return false;
             }
             
-            // Simple collision detection
-            if (pipe.left <= 35 && pipe.left >= 25) {
-              if (birdTop <= pipe.topHeight + 70 || birdTop >= pipe.bottomTop - 5) {
-                endGame();
-                return false;
-              }
+            // Collision detection matching your original getBoundingClientRect logic
+            const birdLeft = 30;
+            const birdRight = 35; 
+            const birdTopPos = birdTop;
+            const birdBottom = birdTop + 8;
+            
+            const pipeLeft = pipe.left;
+            const pipeRight = pipe.left + 6;
+            
+            if (birdLeft < pipeRight && birdRight > pipeLeft && 
+                birdTopPos < pipe.topHeight + 70 && birdBottom > pipe.topHeight + 70) {
+              endGame();
+              return false;
             }
             
-            // Scoring
-            if (!pipe.scored && pipe.left <= 30) {
+            if (birdLeft < pipeRight && birdRight > pipeLeft && 
+                birdTopPos < pipe.bottomTop && birdBottom > pipe.bottomTop) {
+              endGame();
+              return false;
+            }
+            
+            // Scoring - when pipe passes bird
+            if (!pipe.scored && pipe.left + 6 < birdLeft) {
               pipe.scored = true;
               setScore(prev => prev + 1);
             }
