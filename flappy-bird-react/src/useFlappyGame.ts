@@ -87,10 +87,14 @@ export const useFlappyGame = () => {
     setGameState('Play');
     
     const gameLoop = () => {
-      if (gameState !== 'Play') return;
+      // Check if game is still playing
+      if (gameState === 'End') return;
 
       const bird = birdRef.current;
-      if (!bird || !backgroundRect.current) return;
+      if (!bird || !backgroundRect.current) {
+        gameLoopRef.current = requestAnimationFrame(gameLoop);
+        return;
+      }
 
       // Light gravity - bird falls gently
       birdDy.current += gravity;
@@ -133,7 +137,7 @@ export const useFlappyGame = () => {
         pipes.current.push(pipeTop, pipeBottom);
       }
 
-      // Pipe movement and collision - exact logic from your original
+      // Pipe movement and collision
       pipes.current = pipes.current.filter(pipe => {
         const pipeRect = pipe.getBoundingClientRect();
 
@@ -146,14 +150,11 @@ export const useFlappyGame = () => {
 
         // Scoring logic
         if ((pipe as any).increase_score && pipeRect.right < birdProps.left) {
-          setScore(prev => {
-            const newScore = prev + 1;
-            return newScore;
-          });
+          setScore(prev => prev + 1);
           (pipe as any).increase_score = false;
         }
 
-        // Exact collision detection from your original
+        // Collision detection
         if (
           birdProps.left < pipeRect.left + pipeRect.width &&
           birdProps.left + birdProps.width > pipeRect.left &&
@@ -172,7 +173,7 @@ export const useFlappyGame = () => {
     };
 
     gameLoopRef.current = requestAnimationFrame(gameLoop);
-  }, [gameState, endGame]);
+  }, [endGame]); // Remove gameState from dependency to avoid stale closure
 
   // Controls matching your original
   useEffect(() => {
