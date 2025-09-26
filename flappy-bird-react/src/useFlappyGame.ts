@@ -215,7 +215,12 @@ export const useFlappyGame = () => {
     gameState,
     score,
     highScore,
+    birdTop: birdRef.current ? birdRef.current.offsetTop * 100 / window.innerHeight : 40, // Convert to vh
+    pipes: [], // Empty array since we use DOM manipulation
     birdRef,
+    startGame: resetGame,
+    beginGameplay: startGameLoop,
+    jump,
     resetGame
   };
 };
