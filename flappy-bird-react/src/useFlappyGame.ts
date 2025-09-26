@@ -25,9 +25,9 @@ export const useFlappyGame = () => {
 
   // Fixed physics - small jump, minimal gravity
   const GRAVITY = 0.15;    // Very light gravity
-  const JUMP_FORCE = -3;   // Small jump (about 1 inch)
-  const MOVE_SPEED = 2;
-  const PIPE_GAP = 35;
+  const JUMP_FORCE = -3.4;   // Small jump (about 1 inch)
+  const MOVE_SPEED = 1.7;
+  const PIPE_GAP = 31;
 
   useEffect(() => {
     const saved = sessionStorage.getItem("flappy_highscore");
