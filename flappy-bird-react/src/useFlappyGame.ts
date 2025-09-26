@@ -3,8 +3,10 @@ import { saveScore } from './firebase';
 
 interface Pipe {
   id: number;
-  x: number;
-  height: [number, number]; // [bottom pipe height, top pipe height]
+  left: number;
+  topHeight: number;
+  bottomTop: number;
+  scored: boolean;
 }
 
 type GameState = 'Start' | 'Ready' | 'Play' | 'End';
@@ -16,18 +18,16 @@ export const useFlappyGame = () => {
   const [pipes, setPipes] = useState<Pipe[]>([]);
   const [highScore, setHighScore] = useState(0);
   
-  const velocity = useRef(0);
-  const deltaTop = useRef(0);
-  const gameTimer = useRef<number>();
+  const birdVelocity = useRef(0);
+  const frameCount = useRef(0);
+  const gameLoop = useRef<number>();
   const pipeIdCounter = useRef(0);
-  const scorePipe = useRef<number | null>(null);
 
-  // Game constants matching the example
-  const GRAVITY = 15; // velocity multiplier
-  const JUMP_DISTANCE = -12; // jump force
-  const PIPE_SPEED = 3.5; // pixels per frame
-  const PIPE_GAP = 150; // gap between top and bottom pipes
-  const PIPE_SPACING = 300; // distance between pipe pairs
+  // Simple, working constants
+  const GRAVITY = 0.4;
+  const JUMP_FORCE = -8;
+  const MOVE_SPEED = 2;
+  const PIPE_GAP = 35;
 
   useEffect(() => {
     const saved = sessionStorage.getItem("flappy_highscore");
@@ -73,110 +73,27 @@ export const useFlappyGame = () => {
     }
   }, []);
 
-  // Generate pipe pair heights
-  const generatePipePairs = useCallback(() => {
-    const minHeight = 50;
-    const maxHeight = 250;
-    const bottomPipeHeight = Math.floor(Math.random() * (maxHeight - minHeight)) + minHeight;
-    const topPipeHeight = 400 - bottomPipeHeight - PIPE_GAP;
-    return [bottomPipeHeight, topPipeHeight];
-  }, [PIPE_GAP]);
-
-  // Fall physics exactly like the example
-  const fall = useCallback(() => {
-    const maxBot = 90; // bottom boundary in vh
-    let deltaPos = deltaTop.current + (velocity.current * 0.016);
-    const newPos = birdTop + deltaPos;
-    
-    return { 
-      newPos: newPos <= maxBot ? newPos : maxBot, 
-      newDeltaPos: deltaPos 
-    };
-  }, [birdTop]);
-
-  // Jump function exactly like the example
   const jump = useCallback(() => {
     if (gameState === 'Play') {
-      const minTop = 0;
-      const newPos = birdTop + JUMP_DISTANCE;
-      setBirdTop(newPos >= minTop ? newPos : minTop);
-      deltaTop.current = JUMP_DISTANCE;
+      birdVelocity.current = JUMP_FORCE;
     }
-  }, [gameState, birdTop, JUMP_DISTANCE]);
+  }, [gameState]);
 
-  // Update pipes exactly like the example
-  const updatePipes = useCallback(() => {
-    // Remove out of bound pipes
-    const cleaned = pipes.filter(p => p.x >= -50);
-    const missing = (4 - cleaned.length);
-    let baseDistance = 100; // start position in vw
-    const copy = [...cleaned];
-    
-    for(let i = 0; i < missing; i++) {
-      baseDistance += PIPE_SPACING / 10; // convert to vw
-      const newPipe: Pipe = {
-        x: baseDistance,
-        id: pipeIdCounter.current++,
-        height: generatePipePairs(),
-      };
-      copy.push(newPipe);
-    }
-    
-    // Move pipes
-    const movePipes = copy.map((p) => ({ ...p, x: p.x - PIPE_SPEED }));
-    return movePipes;
-  }, [pipes, generatePipePairs, PIPE_SPEED, PIPE_SPACING]);
+  const startGame = useCallback(() => {
+    setGameState('Ready');
+    setScore(0);
+    setBirdTop(40);
+    setPipes([]);
+    birdVelocity.current = 0;
+    frameCount.current = 0;
+    pipeIdCounter.current = 0;
+  }, []);
 
-  // Update game state
-  const updateGame = useCallback((winningPipe: number | null) => {
-    const newScore = scorePipe.current && scorePipe.current !== winningPipe ? score + 1 : score;
-    
-    const newFallPosition = fall();
-    const newPipes = updatePipes();
-
-    setBirdTop(newFallPosition.newPos);
-    setPipes(newPipes);
-    deltaTop.current = newFallPosition.newDeltaPos;
-    scorePipe.current = winningPipe;
-    setScore(newScore);
-  }, [score, fall, updatePipes]);
-
-  // Check game state - collision and scoring
-  const checkGame = useCallback(() => {
-    // Check for collision
-    const collisionPipe = pipes.filter(p => p.x >= 20 && p.x <= 40);
-    if(collisionPipe.length) {
-      const pipe = collisionPipe[0];
-      const topLimit = (pipe.height[1] / 400) * 100; // convert to vh
-      const botLimit = 100 - (pipe.height[0] / 400) * 100; // convert to vh
-      
-      if(birdTop <= topLimit || birdTop >= botLimit - 8) { // 8vh for bird height
-        return stopGame();
-      }
-    }
-
-    // Check for scoring
-    const winningPipe = pipes.filter(p => p.x >= 15 && p.x <= 25);
-    if(winningPipe.length) {
-      return updateGame(winningPipe[0].id);
-    }
-
-    updateGame(null);
-  }, [pipes, birdTop, updateGame]);
-
-  // Start game with timer like the example
-  const startGameLoop = useCallback(() => {
-    if (gameTimer.current) clearInterval(gameTimer.current);
-    gameTimer.current = window.setInterval(() => checkGame(), 16.66); // 60fps
+  const beginGameplay = useCallback(() => {
     setGameState('Play');
-  }, [checkGame]);
+  }, []);
 
-  // Stop game
-  const stopGame = useCallback(() => {
-    if (gameTimer.current) {
-      clearInterval(gameTimer.current);
-      gameTimer.current = undefined;
-    }
+  const endGame = useCallback(() => {
     setGameState('End');
     
     if (score > 0) {
@@ -191,20 +108,83 @@ export const useFlappyGame = () => {
     deductPlay();
   }, [score, highScore, deductPlay]);
 
-  const startGame = useCallback(() => {
-    setGameState('Ready');
-    setScore(0);
-    setBirdTop(40);
-    setPipes([]);
-    velocity.current = GRAVITY;
-    deltaTop.current = 0;
-    pipeIdCounter.current = 0;
-    scorePipe.current = null;
-  }, [GRAVITY]);
-
   const resetGame = useCallback(() => {
     startGame();
   }, [startGame]);
+
+  // Simple game loop
+  useEffect(() => {
+    if (gameState !== 'Play') return;
+
+    const runGameLoop = () => {
+      // Bird physics - simple gravity
+      birdVelocity.current += GRAVITY;
+      setBirdTop(prev => {
+        const newTop = prev + birdVelocity.current;
+        
+        // Boundary check
+        if (newTop <= 0 || newTop >= 85) {
+          endGame();
+          return prev;
+        }
+        
+        return newTop;
+      });
+
+      // Generate new pipes
+      if (frameCount.current % 90 === 0) {
+        const pipeTopHeight = Math.floor(Math.random() * 50) + 10;
+        const newPipe: Pipe = {
+          id: pipeIdCounter.current++,
+          left: 100,
+          topHeight: pipeTopHeight - 70,
+          bottomTop: pipeTopHeight + PIPE_GAP,
+          scored: false
+        };
+        
+        setPipes(prev => [...prev, newPipe]);
+      }
+
+      // Move and update pipes
+      setPipes(prev => {
+        return prev
+          .map(pipe => ({ ...pipe, left: pipe.left - MOVE_SPEED }))
+          .filter(pipe => {
+            // Remove off-screen pipes
+            if (pipe.left < -10) {
+              return false;
+            }
+            
+            // Simple collision detection
+            if (pipe.left <= 35 && pipe.left >= 25) {
+              if (birdTop <= pipe.topHeight + 70 || birdTop >= pipe.bottomTop - 5) {
+                endGame();
+                return false;
+              }
+            }
+            
+            // Scoring
+            if (!pipe.scored && pipe.left <= 30) {
+              pipe.scored = true;
+              setScore(prev => prev + 1);
+            }
+            
+            return true;
+          });
+      });
+
+      frameCount.current++;
+      gameLoop.current = requestAnimationFrame(runGameLoop);
+    };
+
+    gameLoop.current = requestAnimationFrame(runGameLoop);
+
+    return () => {
+      if (gameLoop.current) {
+        cancelAnimationFrame(gameLoop.current);
+      }
+    };
+  }, [gameState, birdTop, endGame]);
 
   // Controls
   useEffect(() => {
@@ -218,7 +198,7 @@ export const useFlappyGame = () => {
       if ((e.key === 'ArrowUp' || e.key === ' ')) {
         e.preventDefault();
         if (gameState === 'Ready') {
-          startGameLoop();
+          beginGameplay();
           jump();
         } else if (gameState === 'Play') {
           jump();
@@ -228,14 +208,14 @@ export const useFlappyGame = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameState, jump, startGame, startGameLoop]);
+  }, [gameState, jump, startGame, beginGameplay]);
 
   useEffect(() => {
     const handleTouch = () => {
       if (gameState === 'Start') {
         startGame();
       } else if (gameState === 'Ready') {
-        startGameLoop();
+        beginGameplay();
         jump();
       } else if (gameState === 'Play') {
         jump();
@@ -244,30 +224,16 @@ export const useFlappyGame = () => {
 
     window.addEventListener('touchstart', handleTouch);
     return () => window.removeEventListener('touchstart', handleTouch);
-  }, [gameState, jump, startGame, startGameLoop]);
-
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      if (gameTimer.current) {
-        clearInterval(gameTimer.current);
-      }
-    };
-  }, []);
+  }, [gameState, jump, startGame, beginGameplay]);
 
   return {
     gameState,
     score,
     highScore,
     birdTop,
-    pipes: pipes.map(p => ({
-      id: p.id,
-      left: p.x,
-      topHeight: -70 + (p.height[1] / 400) * 100,
-      bottomTop: 100 - (p.height[0] / 400) * 100,
-      scored: false
-    })),
+    pipes,
     startGame,
+    beginGameplay,
     jump
   };
 };
