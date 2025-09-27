@@ -1,3 +1,4 @@
+
 import { useFlappyGame } from './useFlappyGame';
 import Leaderboard from './Leaderboard';
 import './Game.css';
@@ -34,28 +35,6 @@ export default function Game() {
         width="130"
         height="100"
       />
-
-      {/* Pipes - will be empty since we use DOM manipulation */}
-      {pipes.map(pipe => (
-        <div key={pipe.id}>
-          <div 
-            className="pipe_sprite"
-            style={{
-              left: `${pipe.left}vw`,
-              top: `${pipe.topHeight}vh`,
-              height: '60vh'
-            }}
-          />
-          <div 
-            className="pipe_sprite"
-            style={{
-              left: `${pipe.left}vw`,
-              top: `${pipe.bottomTop}vh`,
-              height: '60vh'
-            }}
-          />
-        </div>
-      ))}
 
       {/* Game Messages */}
       {gameState === 'Start' && (
