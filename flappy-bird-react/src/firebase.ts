@@ -74,33 +74,49 @@ export const saveScore = async (score: number): Promise<void> => {
     console.log('✅ Starting save process...');
     
     // Get username from Monad Games API
+    console.log('📡 Fetching username from Monad API...');
     const fetchedUsername = await getMonadUsername(wallet);
+    console.log('📡 API returned username:', fetchedUsername);
     
-    // Prefer stored username, otherwise fallback to fetched
+    // Use stored username if available, otherwise use fetched one
     const finalUsername = username || fetchedUsername;
+    console.log('🏷️ Final username to save:', finalUsername);
     
     const scoresRef = ref(db, "scores/" + wallet);
+    console.log('🔍 Checking existing score in Firebase...');
+    
     const snapshot = await get(scoresRef);
     const existingScore = snapshot.exists() ? snapshot.val().score : 0;
     
-    console.log(`📊 Existing: ${existingScore}, New: ${score}`);
+    console.log('📊 Comparison:');
+    console.log('- Existing score:', existingScore);
+    console.log('- New score:', score);
+    console.log('- Is new score higher?', score > existingScore);
     
-    // Always save if higher OR if no score exists
-    if (!snapshot.exists() || score > existingScore) {
+    if (score > existingScore) {
+      console.log('🚀 Saving new high score to Firebase...');
+      
       const dataToSave = {
         username: finalUsername,
-        wallet,
-        score,
+        wallet: wallet,
+        score: score,
         timestamp: Date.now()
       };
       
+      console.log('💾 Data being saved:', dataToSave);
+      
       await set(scoresRef, dataToSave);
-      console.log('✅ Score saved successfully:', dataToSave);
+      console.log('✅ Score saved successfully to Firebase!');
+      
+      // Force reload leaderboard
+      console.log('🔄 Score save completed - leaderboard should update');
+      
     } else {
-      console.log('⚠️ New score is not higher, skipping save.');
+      console.log('⚠️ Score not higher than existing, not saving');
     }
   } catch (error) {
     console.error('❌ Error saving score to Firebase:', error);
+    console.error('❌ Error details:', error);
   }
   
   console.log('=== SAVE SCORE FUNCTION ENDED ===');
