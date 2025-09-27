@@ -16,11 +16,11 @@ export const useFlappyGame = () => {
   const frameCount = useRef(0);
   const backgroundRect = useRef<DOMRect>();
 
-  // Simple game constants
-  const moveSpeed = 1.5;     // Slower pipe movement
-  const gravity = 0.2;       // Light gravity so bird falls gently
-  const pipeGap = 35;
-  const jumpForce = -3;      // Small jump force
+  // Faster, more responsive constants
+  const moveSpeed = 0.8;     // Pipe movement speed
+  const gravity = 0.6;       // Increased gravity for faster falling
+  const pipeGap = 35;        // Gap between pipes
+  const jumpForce = -7.8;      // Stronger jump for better response
 
   useEffect(() => {
     const saved = sessionStorage.getItem("flappy_highscore");
@@ -44,6 +44,12 @@ export const useFlappyGame = () => {
   }, [gameState]);
 
   const endGame = useCallback(() => {
+    // Stop game loop immediately
+    if (gameLoopRef.current) {
+      cancelAnimationFrame(gameLoopRef.current);
+      gameLoopRef.current = undefined;
+    }
+    
     setGameState('End');
     
     if (birdRef.current) {
@@ -59,15 +65,16 @@ export const useFlappyGame = () => {
       setHighScore(score);
       sessionStorage.setItem("flappy_highscore", score.toString());
     }
-
-    // Stop game loop
-    if (gameLoopRef.current) {
-      cancelAnimationFrame(gameLoopRef.current);
-    }
   }, [score, highScore]);
 
   const resetGame = useCallback(() => {
-    // Clean up existing pipes like your original
+    // CRITICAL: Stop any existing game loop first
+    if (gameLoopRef.current) {
+      cancelAnimationFrame(gameLoopRef.current);
+      gameLoopRef.current = undefined;
+    }
+    
+    // Clean up existing pipes
     document.querySelectorAll('.pipe_sprite').forEach(e => e.remove());
     pipes.current = [];
     
@@ -76,27 +83,30 @@ export const useFlappyGame = () => {
       birdRef.current.style.top = '40vh';
     }
     
+    // Reset all game state
     birdDy.current = 0;
     setScore(0);
-    setBirdTop(40); // Reset bird position in state too
+    setBirdTop(40);
     frameCount.current = 0;
     setGameState('Ready');
   }, []);
 
   const startGameLoop = useCallback(() => {
+    // CRITICAL: Stop any existing game loop before starting new one
+    if (gameLoopRef.current) {
+      cancelAnimationFrame(gameLoopRef.current);
+    }
+    
     setGameState('Play');
     
     const gameLoop = () => {
-      // Check if game is still playing
-      if (gameState === 'End') return;
-
       const bird = birdRef.current;
       if (!bird || !backgroundRect.current) {
         gameLoopRef.current = requestAnimationFrame(gameLoop);
         return;
       }
 
-      // Light gravity - bird falls gently
+      // Faster gravity and physics
       birdDy.current += gravity;
       const newTopPixels = bird.offsetTop + birdDy.current;
       
@@ -106,30 +116,38 @@ export const useFlappyGame = () => {
         return;
       }
       
-      // Update DOM element
+      // Update DOM element (fixed positioning)
       bird.style.top = newTopPixels + 'px';
       
-      // Update React state for rendering (convert pixels to vh)
+      // Update React state for rendering
       const newTopVh = (newTopPixels / window.innerHeight) * 100;
       setBirdTop(newTopVh);
       
       const birdProps = bird.getBoundingClientRect();
 
-      // Pipe generation - every 0.5 seconds (30 frames at 60fps)
-      if (frameCount.current % 30 === 0) {
+      // Pipe generation - with proper spacing
+      if (frameCount.current % 40 === 0) {
         const pipePos = Math.floor(Math.random() * 43) + 8;
 
-        // Top pipe
+        // Top pipe - FIXED position
         const pipeTop = document.createElement('div');
         pipeTop.className = 'pipe_sprite';
-        pipeTop.style.top = (pipePos - 70) + 'vh';
+        pipeTop.style.position = 'fixed';
+        pipeTop.style.top = '0vh';
+        pipeTop.style.height = (pipePos) + 'vh';
         pipeTop.style.left = '100vw';
+        pipeTop.style.width = '6vw';
+        pipeTop.style.zIndex = '10';
 
-        // Bottom pipe  
+        // Bottom pipe - FIXED position  
         const pipeBottom = document.createElement('div');
         pipeBottom.className = 'pipe_sprite';
+        pipeBottom.style.position = 'fixed';
         pipeBottom.style.top = (pipePos + pipeGap) + 'vh';
+        pipeBottom.style.height = (100 - pipePos - pipeGap) + 'vh';
         pipeBottom.style.left = '100vw';
+        pipeBottom.style.width = '6vw';
+        pipeBottom.style.zIndex = '10';
         (pipeBottom as any).increase_score = true;
 
         document.body.appendChild(pipeTop);
@@ -137,7 +155,7 @@ export const useFlappyGame = () => {
         pipes.current.push(pipeTop, pipeBottom);
       }
 
-      // Pipe movement and collision
+      // Pipe movement - pipes move independently, no collision interference
       pipes.current = pipes.current.filter(pipe => {
         const pipeRect = pipe.getBoundingClientRect();
 
@@ -146,15 +164,17 @@ export const useFlappyGame = () => {
           return false;
         }
 
-        pipe.style.left = (pipeRect.left - moveSpeed) + 'px';
+        // Move pipe smoothly - no external interference
+        const currentLeft = parseFloat(pipe.style.left);
+        pipe.style.left = (currentLeft - moveSpeed) + 'vw';
 
-        // Scoring logic
+        // Scoring
         if ((pipe as any).increase_score && pipeRect.right < birdProps.left) {
           setScore(prev => prev + 1);
           (pipe as any).increase_score = false;
         }
 
-        // Collision detection
+        // Collision detection - doesn't affect pipe position
         if (
           birdProps.left < pipeRect.left + pipeRect.width &&
           birdProps.left + birdProps.width > pipeRect.left &&
