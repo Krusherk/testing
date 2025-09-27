@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { usePrivy, CrossAppAccountWithMetadata } from '@privy-io/react-auth';
 import { useMonadGamesUser } from './useMonadGamesUser';
