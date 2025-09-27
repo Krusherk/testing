@@ -140,7 +140,7 @@ export const useFlappyGame = () => {
       const birdProps = bird.getBoundingClientRect();
 
       // Pipe generation - with proper spacing
-      if (frameCount.current % 90 === 0) {
+      if (frameCount.current % 45 === 0) {
         const pipePos = Math.floor(Math.random() * 43) + 8;
 
         // Top pipe - FIXED position
