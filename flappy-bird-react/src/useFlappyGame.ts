@@ -17,7 +17,7 @@ export const useFlappyGame = () => {
   const backgroundRect = useRef<DOMRect>();
 
   // Faster, more responsive constants
-  const moveSpeed = 0.8;     // Pipe movement speed
+  const moveSpeed = 0.77;     // Pipe movement speed
   const gravity = 0.6;       // Increased gravity for faster falling
   const pipeGap = 35;        // Gap between pipes
   const jumpForce = -7.8;      // Stronger jump for better response
