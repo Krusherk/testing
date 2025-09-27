@@ -17,7 +17,7 @@ export const useFlappyGame = () => {
   const backgroundRect = useRef<DOMRect>();
 
   // Faster, more responsive constants
-  const moveSpeed = 0.77;     // Pipe movement speed
+  const moveSpeed = 0.65;     // Pipe movement speed
   const gravity = 0.6;       // Increased gravity for faster falling
   const pipeGap = 35;        // Gap between pipes
   const jumpForce = -7.8;      // Stronger jump for better response
@@ -126,7 +126,7 @@ export const useFlappyGame = () => {
       const birdProps = bird.getBoundingClientRect();
 
       // Pipe generation - with proper spacing
-      if (frameCount.current % 40 === 0) {
+      if (frameCount.current % 45 === 0) {
         const pipePos = Math.floor(Math.random() * 43) + 8;
 
         // Top pipe - FIXED position
