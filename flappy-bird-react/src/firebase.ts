@@ -55,64 +55,129 @@ const getMonadUsername = async (walletAddress: string): Promise<string> => {
 };
 
 export const saveScore = async (score: number): Promise<void> => {
+  console.log('=== SAVE SCORE FUNCTION CALLED ===');
+  
   const wallet = sessionStorage.getItem("flappy_wallet");
-  if (!wallet || score <= 0) return;
+  const username = sessionStorage.getItem("flappy_discord");
+  
+  console.log('Retrieved from sessionStorage:');
+  console.log('- Wallet:', wallet);
+  console.log('- Username:', username);
+  console.log('- Score to save:', score);
+  
+  if (!wallet || score <= 0) {
+    console.log('❌ Cannot save - No wallet or score <= 0:', { wallet, score });
+    return;
+  }
 
   try {
+    console.log('✅ Starting save process...');
+    
     // Get username from Monad Games API
-    const username = await getMonadUsername(wallet);
+    console.log('📡 Fetching username from Monad API...');
+    const fetchedUsername = await getMonadUsername(wallet);
+    console.log('📡 API returned username:', fetchedUsername);
+    
+    // Use stored username if available, otherwise use fetched one
+    const finalUsername = username || fetchedUsername;
+    console.log('🏷️ Final username to save:', finalUsername);
     
     const scoresRef = ref(db, "scores/" + wallet);
-    const snapshot = await get(scoresRef);
-    const existing = snapshot.exists() ? snapshot.val().score : 0;
+    console.log('🔍 Checking existing score in Firebase...');
     
-    if (score > existing) {
-      await set(scoresRef, {
-        username: username,
+    const snapshot = await get(scoresRef);
+    const existingScore = snapshot.exists() ? snapshot.val().score : 0;
+    
+    console.log('📊 Comparison:');
+    console.log('- Existing score:', existingScore);
+    console.log('- New score:', score);
+    console.log('- Is new score higher?', score > existingScore);
+    
+    if (score > existingScore) {
+      console.log('🚀 Saving new high score to Firebase...');
+      
+      const dataToSave = {
+        username: finalUsername,
         wallet: wallet,
         score: score,
         timestamp: Date.now()
-      });
-      console.log('Score saved:', { username, score });
+      };
+      
+      console.log('💾 Data being saved:', dataToSave);
+      
+      await set(scoresRef, dataToSave);
+      console.log('✅ Score saved successfully to Firebase!');
+      
+      // Force reload leaderboard
+      console.log('🔄 Score save completed - leaderboard should update');
+      
+    } else {
+      console.log('⚠️ Score not higher than existing, not saving');
     }
   } catch (error) {
-    console.error("Error saving score:", error);
+    console.error('❌ Error saving score to Firebase:', error);
+    console.error('❌ Error details:', error);
   }
+  
+  console.log('=== SAVE SCORE FUNCTION ENDED ===');
 };
 
 export const loadLeaderboard = async (
   onUpdate: (scores: LeaderboardEntry[], currentUserEntry: LeaderboardEntry | null) => void
 ): Promise<void> => {
-  const myWallet = sessionStorage.getItem("flappy_wallet")?.toLowerCase() || "";
+  try {
+    console.log('Loading leaderboard...');
+    const myWallet = sessionStorage.getItem("flappy_wallet")?.toLowerCase() || "";
+    console.log('My wallet:', myWallet);
 
-  const scoresRef = ref(db, "scores");
-  const topScoresQuery = query(scoresRef, orderByChild("score"), limitToLast(10));
+    const scoresRef = ref(db, "scores");
+    const topScoresQuery = query(scoresRef, orderByChild("score"), limitToLast(10));
 
-  onValue(topScoresQuery, async (snapshot) => {
-    const scores: LeaderboardEntry[] = [];
-    let currentUserEntry: LeaderboardEntry | null = null;
+    onValue(topScoresQuery, async (snapshot) => {
+      try {
+        console.log('Firebase snapshot received');
+        const scores: LeaderboardEntry[] = [];
+        let currentUserEntry: LeaderboardEntry | null = null;
 
-    snapshot.forEach((child) => {
-      const entry = child.val();
-      scores.push({
-        username: entry.username || 'Anonymous',
-        wallet: entry.wallet,
-        score: entry.score,
-        timestamp: entry.timestamp
-      });
+        snapshot.forEach((child) => {
+          const entry = child.val();
+          console.log('Score entry:', entry);
+          scores.push({
+            username: entry.username || 'Anonymous',
+            wallet: entry.wallet,
+            score: entry.score,
+            timestamp: entry.timestamp
+          });
 
-      // Check if this is the current user
-      if (entry.wallet?.toLowerCase() === myWallet) {
-        currentUserEntry = {
-          username: entry.username || 'Anonymous',
-          wallet: entry.wallet,
-          score: entry.score,
-          timestamp: entry.timestamp
-        };
+          // Check if this is the current user
+          if (entry.wallet?.toLowerCase() === myWallet) {
+            currentUserEntry = {
+              username: entry.username || 'Anonymous',
+              wallet: entry.wallet,
+              score: entry.score,
+              timestamp: entry.timestamp
+            };
+          }
+        });
+
+        scores.reverse(); // highest first
+        console.log('Processed scores:', scores);
+        console.log('Current user entry:', currentUserEntry);
+        
+        onUpdate(scores, currentUserEntry);
+      } catch (error) {
+        console.error('Error processing snapshot:', error);
+        // Still call onUpdate with empty data so loading stops
+        onUpdate([], null);
       }
+    }, (error) => {
+      console.error('Firebase onValue error:', error);
+      // Call onUpdate with empty data so loading stops
+      onUpdate([], null);
     });
-
-    scores.reverse(); // highest first
-    onUpdate(scores, currentUserEntry);
-  });
+  } catch (error) {
+    console.error('Error in loadLeaderboard:', error);
+    // Call onUpdate with empty data so loading stops
+    onUpdate([], null);
+  }
 };
