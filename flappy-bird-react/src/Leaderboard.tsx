@@ -1,169 +1,107 @@
-import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, set, query, orderByChild, limitToLast, onValue, get } from 'firebase/database';
+import { useState, useEffect } from 'react';
+import { loadLeaderboard, type LeaderboardEntry } from './firebase';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBJC8jBpf4RJcrjAhgYumUmYzlOxma-ojk",
-  authDomain: "flappydak.firebaseapp.com",
-  databaseURL: "https://flappydak-default-rtdb.firebaseio.com",
-  projectId: "flappydak",
-  storageBucket: "flappydak.firebasestorage.app",
-  messagingSenderId: "189314171470",
-  appId: "1:189314171470:web:4c3a9068fdb909b147791f",
-  measurementId: "G-R0LF3F59W9"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
-export interface LeaderboardEntry {
-  username: string;
-  wallet: string;
-  score: number;
-  timestamp: number;
+interface LeaderboardProps {
+  currentScore: number;
 }
 
-// Function to get username from Monad Games API
-const getMonadUsername = async (walletAddress: string): Promise<string> => {
-  try {
-    // Try without www first
-    let response;
-    try {
-      response = await fetch(https://monadclip.fun/api/check-wallet?wallet=${walletAddress});
-      if (!response.ok) {
-        throw new Error(API failed with status ${response.status});
-      }
-    } catch (directError) {
-      // Fallback to www version
-      response = await fetch(https://www.monadclip.fun/api/check-wallet?wallet=${walletAddress});
-      if (!response.ok) {
-        throw new Error(API failed with status ${response.status});
-      }
-    }
+export default function Leaderboard({ currentScore }: LeaderboardProps) {
+  const [activeTab, setActiveTab] = useState<'rank' | 'score'>('rank');
+  const [scores, setScores] = useState<LeaderboardEntry[]>([]);
+  const [currentUserEntry, setCurrentUserEntry] = useState<LeaderboardEntry | null>(null);
+  const [loading, setLoading] = useState(true);
 
-    const data = await response.json();
-    if (data.hasUsername && data.user?.username) {
-      return data.user.username;
-    }
-    
-    // Return formatted wallet if no username
-    return ${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)};
-  } catch (error) {
-    console.error('Error fetching username:', error);
-    // Return formatted wallet as fallback
-    return ${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)};
-  }
-};
+  useEffect(() => {
+    const handleLeaderboardUpdate = (newScores: LeaderboardEntry[], userEntry: LeaderboardEntry | null) => {
+      setScores(newScores);
+      setCurrentUserEntry(userEntry);
+      setLoading(false);
+    };
 
-export const saveScore = async (score: number): Promise<void> => {
-  console.log('=== SAVE SCORE FUNCTION CALLED ===');
-  
-  const wallet = sessionStorage.getItem("flappy_wallet");
-  const username = sessionStorage.getItem("flappy_discord");
-  
-  console.log('Retrieved from sessionStorage:');
-  console.log('- Wallet:', wallet);
-  console.log('- Username:', username);
-  console.log('- Score to save:', score);
-  
-  if (!wallet || score <= 0) {
-    console.log('❌ Cannot save - No wallet or score <= 0:', { wallet, score });
-    return;
+    loadLeaderboard(handleLeaderboardUpdate);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="leaderboard">
+        <div className="leaderboard-header">
+          <h2>LEADERBOARD</h2>
+          <p className="subtext">Loading scores...</p>
+        </div>
+      </div>
+    );
   }
 
-  try {
-    console.log('✅ Starting save process...');
-    
-    // Get username from Monad Games API
-    const fetchedUsername = await getMonadUsername(wallet);
-    
-    // Prefer stored username, otherwise fallback to fetched
-    const finalUsername = username || fetchedUsername;
-    
-    const scoresRef = ref(db, "scores/" + wallet);
-    console.log("📌 Writing to Firebase path:", "scores/" + wallet);
-    
-    const snapshot = await get(scoresRef);
-    const existingScore = snapshot.exists() ? snapshot.val().score : 0;
-    
-    console.log(📊 Existing: ${existingScore}, New: ${score});
-    
-    // Always save if higher OR if no score exists
-    if (!snapshot.exists() || score > existingScore) {
-      const dataToSave = {
-        username: finalUsername,
-        wallet,
-        score,
-        timestamp: Date.now()
-      };
+  const myWallet = sessionStorage.getItem("flappy_wallet")?.toLowerCase();
+  const isInTop10 = scores.some(s => s.wallet?.toLowerCase() === myWallet);
+
+  return (
+    <div className="leaderboard">
+      <div className="leaderboard-header">
+        <h2>LEADERBOARD</h2>
+        <p className="subtext">Live Monad Games ID players</p>
+        <div className="leaderboard-toggle">
+          <button 
+            className={`toggle-btn ${activeTab === 'rank' ? 'active' : ''}`}
+            onClick={() => setActiveTab('rank')}
+          >
+            Game Rank
+          </button>
+          <button 
+            className={`toggle-btn ${activeTab === 'score' ? 'active' : ''}`}
+            onClick={() => setActiveTab('score')}
+          >
+            High Score
+          </button>
+        </div>
+      </div>
       
-      await set(scoresRef, dataToSave);
-      console.log('✅ Score saved successfully:', dataToSave);
-    } else {
-      console.log('⚠️ New score is not higher, skipping save.');
-    }
-  } catch (error) {
-    console.error('❌ Error saving score to Firebase:', error);
-  }
-  
-  console.log('=== SAVE SCORE FUNCTION ENDED ===');
-};
+      <ul className="leaderboard-list">
+        {/* Show current game score if playing */}
+        {currentScore > 0 && (
+          <li style={{ color: '#FFD700', borderBottom: '2px solid #FFD700' }}>
+            <span className="rank">Current:</span>
+            <span className="leaderboard-player">{currentUserEntry?.username || 'You'}</span>
+            <span className="leaderboard-score">{currentScore}</span>
+          </li>
+        )}
 
-export const loadLeaderboard = async (
-  onUpdate: (scores: LeaderboardEntry[], currentUserEntry: LeaderboardEntry | null) => void
-): Promise<void> => {
-  try {
-    console.log('Loading leaderboard...');
-    const myWallet = sessionStorage.getItem("flappy_wallet")?.toLowerCase() || "";
-    console.log('My wallet:', myWallet);
-
-    const scoresRef = ref(db, "scores");
-    const topScoresQuery = query(scoresRef, orderByChild("score"), limitToLast(10));
-
-    onValue(topScoresQuery, async (snapshot) => {
-      try {
-        console.log('Firebase snapshot received');
-        const scores: LeaderboardEntry[] = [];
-        let currentUserEntry: LeaderboardEntry | null = null;
-
-        snapshot.forEach((child) => {
-          const entry = child.val();
-          console.log('Score entry:', entry);
-          scores.push({
-            username: entry.username || 'Anonymous',
-            wallet: entry.wallet,
-            score: entry.score,
-            timestamp: entry.timestamp
-          });
-
-          // Check if this is the current user
-          if (entry.wallet?.toLowerCase() === myWallet) {
-            currentUserEntry = {
-              username: entry.username || 'Anonymous',
-              wallet: entry.wallet,
-              score: entry.score,
-              timestamp: entry.timestamp
-            };
-          }
-        });
-
-        scores.reverse(); // highest first
-        console.log('Processed scores:', scores);
-        console.log('Current user entry:', currentUserEntry);
+        {/* Show personal best if not in top 10 */}
+        {currentUserEntry && !isInTop10 && (
+          <li style={{ color: '#00ff00' }}>
+            <span className="rank">Your Best:</span>
+            <span className="leaderboard-player">{currentUserEntry.username}</span>
+            <span className="leaderboard-score">{currentUserEntry.score}</span>
+          </li>
+        )}
         
-        onUpdate(scores, currentUserEntry);
-      } catch (error) {
-        console.error('Error processing snapshot:', error);
-        // Still call onUpdate with empty data so loading stops
-        onUpdate([], null);
-      }
-    }, (error) => {
-      console.error('Firebase onValue error:', error);
-      // Call onUpdate with empty data so loading stops
-      onUpdate([], null);
-    });
-  } catch (error) {
-    console.error('Error in loadLeaderboard:', error);
-    // Call onUpdate with empty data so loading stops
-    onUpdate([], null);
-  }
-};
+        {/* Top 10 leaderboard */}
+        {scores.map((entry, index) => (
+          <li 
+            key={entry.wallet}
+            className={
+              index === 0 ? 'top-1' : 
+              index === 1 ? 'top-2' : 
+              index === 2 ? 'top-3' : ''
+            }
+            style={{
+              color: entry.wallet?.toLowerCase() === myWallet
+                ? '#FFD700' 
+                : undefined
+            }}
+          >
+            <span className="rank">#{index + 1}</span>
+            <span className="leaderboard-player">{entry.username}</span>
+            <span className="leaderboard-score">{entry.score}</span>
+          </li>
+        ))}
+
+        {scores.length === 0 && (
+          <li>
+            <span>No scores yet. Be the first!</span>
+          </li>
+        )}
+      </ul>
+    </div>
+  );
+}
