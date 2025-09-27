@@ -1,10 +1,9 @@
-
 import { useFlappyGame } from './useFlappyGame';
 import Leaderboard from './Leaderboard';
 import './Game.css';
 
 export default function Game() {
-  const { gameState, score, birdTop, pipes, startGame, beginGameplay, jump, birdRef } = useFlappyGame();
+  const { gameState, score, highScore, birdTop, pipes, startGame, beginGameplay, jump } = useFlappyGame();
 
   const handleClick = () => {
     if (gameState === 'Start' || gameState === 'End') {
@@ -24,7 +23,6 @@ export default function Game() {
       
       {/* Bird */}
       <img 
-        ref={birdRef}
         src="/images/Bird-2.svg" 
         alt="bird-img" 
         className="bird" 
@@ -36,7 +34,31 @@ export default function Game() {
         height="100"
       />
 
-      {/* Game Messages */}
+      {/* Pipes */}
+      {pipes.map(pipe => (
+        <div key={`${pipe.id}-top`}>
+          {/* Top pipe */}
+          <div 
+            className="pipe_sprite"
+            style={{
+              left: `${pipe.left}vw`,
+              top: `${pipe.topHeight}vh`,
+              height: '60vh'
+            }}
+          />
+          {/* Bottom pipe */}
+          <div 
+            className="pipe_sprite"
+            style={{
+              left: `${pipe.left}vw`,
+              top: `${pipe.bottomTop}vh`,
+              height: '60vh'
+            }}
+          />
+        </div>
+      ))}
+
+      {/* Game Message */}
       {gameState === 'Start' && (
         <div className="message messageStyle">
           Press Enter To Start Game
