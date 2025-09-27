@@ -20,7 +20,7 @@ export const useFlappyGame = () => {
   const moveSpeed = 0.65;     // Pipe movement speed
   const gravity = 0.6;       // Increased gravity for faster falling
   const pipeGap = 35;        // Gap between pipes
-  const jumpForce = -7.8;      // Stronger jump for better response
+  const jumpForce = -7.9;      // Stronger jump for better response
 
   useEffect(() => {
     const saved = sessionStorage.getItem("flappy_highscore");
