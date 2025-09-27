@@ -1,6 +1,5 @@
 
 import { useFlappyGame } from './useFlappyGame';
-import Leaderboard from './Leaderboard';
 import './Game.css';
 
 export default function Game() {
