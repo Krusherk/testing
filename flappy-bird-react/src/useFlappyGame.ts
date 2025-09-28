@@ -1,12 +1,12 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { saveScore } from './firebase';
 
 type GameState = 'Start' | 'Ready' | 'Play' | 'End';
 
 export const useFlappyGame = () => {
   const [gameState, setGameState] = useState<GameState>('Start');
   const [score, setScore] = useState(0);
-  const [birdTop, setBirdTop] = useState(40); // Track bird position in state
+  const [birdTop, setBirdTop] = useState(40);
   const [highScore, setHighScore] = useState(0);
   
   const birdRef = useRef<HTMLImageElement>(null);
@@ -16,20 +16,19 @@ export const useFlappyGame = () => {
   const frameCount = useRef(0);
   const backgroundRect = useRef<DOMRect>();
 
-  // Faster, more responsive constants
-  const moveSpeed = 0.68;     // Pipe movement speed
-  const gravity = 0.6;       // Increased gravity for faster falling
+  // Game constants
+  const moveSpeed = 0.65;     // Pipe movement speed
+  const gravity = 0.6;       // Gravity for falling
   const pipeGap = 35;        // Gap between pipes
-  const jumpForce = -7.8;      // Stronger jump for better response
+  const jumpForce = -7.9;    // Jump force
   
   useEffect(() => {
-    const saved = sessionStorage.getItem("flappy_highscore");
+    const saved = localStorage.getItem("flappy_highscore");
     if (saved) {
       setHighScore(parseInt(saved));
     }
   }, []);
 
-  // Get background dimensions like your original
   useEffect(() => {
     const background = document.querySelector('.background') as HTMLElement;
     if (background) {
@@ -37,14 +36,14 @@ export const useFlappyGame = () => {
     }
   }, []);
 
+  // Simplified jump function - mainly for click handler
   const jump = useCallback(() => {
     if (gameState === 'Play') {
-      birdDy.current = jumpForce; // Set upward velocity
+      birdDy.current = jumpForce;
     }
-  }, [gameState]);
+  }, [gameState, jumpForce]);
 
   const endGame = useCallback(() => {
-    // Stop game loop immediately
     if (gameLoopRef.current) {
       cancelAnimationFrame(gameLoopRef.current);
       gameLoopRef.current = undefined;
@@ -56,33 +55,14 @@ export const useFlappyGame = () => {
       birdRef.current.style.display = 'none';
     }
 
-    console.log('=== GAME ENDED ===');
-    console.log('Final score:', score);
-    console.log('Wallet in sessionStorage:', sessionStorage.getItem("flappy_wallet"));
-    console.log('Username in sessionStorage:', sessionStorage.getItem("flappy_discord"));
-
-    // Save score to Firebase - make sure we have the current score
-    if (score > 0) {
-      console.log('Score is > 0, calling saveScore...');
-      saveScore(score).then(() => {
-        console.log('saveScore promise resolved');
-      }).catch((error) => {
-        console.error('saveScore promise rejected:', error);
-      });
-    } else {
-      console.log('Score is 0 or less, not saving');
-    }
-    
-    // Update local high score
+    // Update high score
     if (score > highScore) {
-      console.log('New local high score:', score);
       setHighScore(score);
-      sessionStorage.setItem("flappy_highscore", score.toString());
+      localStorage.setItem("flappy_highscore", score.toString());
     }
   }, [score, highScore]);
 
   const resetGame = useCallback(() => {
-    // CRITICAL: Stop any existing game loop first
     if (gameLoopRef.current) {
       cancelAnimationFrame(gameLoopRef.current);
       gameLoopRef.current = undefined;
@@ -92,9 +72,13 @@ export const useFlappyGame = () => {
     document.querySelectorAll('.pipe_sprite').forEach(e => e.remove());
     pipes.current = [];
     
+    // Reset bird position - set initial position in pixels
     if (birdRef.current) {
       birdRef.current.style.display = 'block';
-      birdRef.current.style.top = '40vh';
+      birdRef.current.style.position = 'absolute';
+      // Set initial position in pixels to match what game loop expects
+      const initialTop = window.innerHeight * 0.4; // 40vh in pixels
+      birdRef.current.style.top = initialTop + 'px';
     }
     
     // Reset all game state
@@ -106,7 +90,6 @@ export const useFlappyGame = () => {
   }, []);
 
   const startGameLoop = useCallback(() => {
-    // CRITICAL: Stop any existing game loop before starting new one
     if (gameLoopRef.current) {
       cancelAnimationFrame(gameLoopRef.current);
     }
@@ -120,30 +103,28 @@ export const useFlappyGame = () => {
         return;
       }
 
-      // Faster gravity and physics
+      // Apply gravity
       birdDy.current += gravity;
       const newTopPixels = bird.offsetTop + birdDy.current;
       
-      // Boundary check
-      if (newTopPixels <= 0 || newTopPixels + bird.clientHeight >= backgroundRect.current.height) {
+      // Boundary check - use proper height comparison
+      const gameHeight = backgroundRect.current ? backgroundRect.current.height : window.innerHeight;
+      if (newTopPixels <= 0 || newTopPixels + bird.clientHeight >= gameHeight) {
         endGame();
         return;
       }
       
-      // Update DOM element (fixed positioning)
+      // Update bird position
+      bird.style.position = 'absolute';
       bird.style.top = newTopPixels + 'px';
-      
-      // Update React state for rendering
-      const newTopVh = (newTopPixels / window.innerHeight) * 100;
-      setBirdTop(newTopVh);
       
       const birdProps = bird.getBoundingClientRect();
 
-      // Pipe generation - with proper spacing
+      // Generate pipes
       if (frameCount.current % 45 === 0) {
         const pipePos = Math.floor(Math.random() * 43) + 8;
 
-        // Top pipe - FIXED position
+        // Top pipe
         const pipeTop = document.createElement('div');
         pipeTop.className = 'pipe_sprite';
         pipeTop.style.position = 'fixed';
@@ -153,7 +134,7 @@ export const useFlappyGame = () => {
         pipeTop.style.width = '6vw';
         pipeTop.style.zIndex = '10';
 
-        // Bottom pipe - FIXED position  
+        // Bottom pipe
         const pipeBottom = document.createElement('div');
         pipeBottom.className = 'pipe_sprite';
         pipeBottom.style.position = 'fixed';
@@ -169,7 +150,7 @@ export const useFlappyGame = () => {
         pipes.current.push(pipeTop, pipeBottom);
       }
 
-      // Pipe movement - pipes move independently, no collision interference
+      // Move pipes and handle collisions
       pipes.current = pipes.current.filter(pipe => {
         const pipeRect = pipe.getBoundingClientRect();
 
@@ -178,17 +159,17 @@ export const useFlappyGame = () => {
           return false;
         }
 
-        // Move pipe smoothly - no external interference
+        // Move pipe
         const currentLeft = parseFloat(pipe.style.left);
         pipe.style.left = (currentLeft - moveSpeed) + 'vw';
 
-        // Scoring
+        // Score
         if ((pipe as any).increase_score && pipeRect.right < birdProps.left) {
           setScore(prev => prev + 1);
           (pipe as any).increase_score = false;
         }
 
-        // Collision detection - doesn't affect pipe position
+        // Collision detection
         if (
           birdProps.left < pipeRect.left + pipeRect.width &&
           birdProps.left + birdProps.width > pipeRect.left &&
@@ -207,42 +188,54 @@ export const useFlappyGame = () => {
     };
 
     gameLoopRef.current = requestAnimationFrame(gameLoop);
-  }, [endGame]); // Remove gameState from dependency to avoid stale closure
+  }, [endGame]);
 
-  // Controls matching your original
+  // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && gameState !== 'Play') {
-        resetGame();
-      }
-      if ((e.key === 'ArrowUp' || e.key === ' ')) {
-        if (gameState === 'Ready') {
-          startGameLoop();
+      e.preventDefault(); // Prevent default browser behavior
+      
+      if (e.key === 'Enter') {
+        // Use a ref to get current game state
+        const currentState = gameState;
+        if (currentState !== 'Play') {
+          resetGame();
         }
-        if (gameState === 'Play') {
-          jump();
+      }
+      if (e.key === 'ArrowUp' || e.key === ' ') {
+        const currentState = gameState;
+        if (currentState === 'Ready') {
+          startGameLoop();
+        } else if (currentState === 'Play') {
+          // Directly set jump force instead of relying on callback
+          birdDy.current = jumpForce;
         }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [gameState, jump, resetGame, startGameLoop]);
+  }, [gameState, resetGame, startGameLoop, jumpForce]); // Add jumpForce to dependencies
 
+  // Touch controls
   useEffect(() => {
-    const handleTouch = () => {
-      if (gameState === 'Start') {
+    const handleTouch = (e: TouchEvent) => {
+      e.preventDefault(); // Prevent default touch behavior
+      
+      const currentState = gameState;
+      if (currentState === 'Start') {
         resetGame();
-      } else if (gameState === 'Ready') {
+      } else if (currentState === 'Ready') {
         startGameLoop();
-      } else if (gameState === 'Play') {
-        jump();
+      } else if (currentState === 'Play') {
+        // Directly set jump force
+        birdDy.current = jumpForce;
       }
     };
 
-    document.addEventListener('touchstart', handleTouch);
+    document.addEventListener('touchstart', handleTouch, { passive: false });
     return () => document.removeEventListener('touchstart', handleTouch);
-  }, [gameState, jump, resetGame, startGameLoop]);
+  }, [gameState, resetGame, startGameLoop, jumpForce]);
 
   // Cleanup
   useEffect(() => {
@@ -258,8 +251,7 @@ export const useFlappyGame = () => {
     gameState,
     score,
     highScore,
-    birdTop, // Now properly tracked in state
-    pipes: [], // Empty array since we use DOM manipulation
+    birdTop,
     birdRef,
     startGame: resetGame,
     beginGameplay: startGameLoop,
