@@ -1,16 +1,15 @@
+
 import { useFlappyGame } from './useFlappyGame';
-import Leaderboard from './Leaderboard';
 import './Game.css';
 
 export default function Game() {
-  const { gameState, score, highScore, birdTop, pipes, startGame, beginGameplay, jump } = useFlappyGame();
-
+  const { gameState, score, highScore, birdTop, birdRef, startGame, beginGameplay, jump } = useFlappyGame();
+  
   const handleClick = () => {
     if (gameState === 'Start' || gameState === 'End') {
       startGame();
     } else if (gameState === 'Ready') {
       beginGameplay();
-      jump();
     } else if (gameState === 'Play') {
       jump();
     }
@@ -23,10 +22,12 @@ export default function Game() {
       
       {/* Bird */}
       <img 
+        ref={birdRef}
         src="/images/Bird-2.svg" 
         alt="bird-img" 
         className="bird" 
         style={{
+          position: 'absolute',
           top: `${birdTop}vh`,
           display: gameState === 'End' ? 'none' : 'block'
         }}
@@ -34,44 +35,18 @@ export default function Game() {
         height="100"
       />
 
-      {/* Pipes */}
-      {pipes.map(pipe => (
-        <div key={`${pipe.id}-top`}>
-          {/* Top pipe */}
-          <div 
-            className="pipe_sprite"
-            style={{
-              left: `${pipe.left}vw`,
-              top: `${pipe.topHeight}vh`,
-              height: '60vh'
-            }}
-          />
-          {/* Bottom pipe */}
-          <div 
-            className="pipe_sprite"
-            style={{
-              left: `${pipe.left}vw`,
-              top: `${pipe.bottomTop}vh`,
-              height: '60vh'
-            }}
-          />
-        </div>
-      ))}
-
-      {/* Game Message */}
+      {/* Game Messages */}
       {gameState === 'Start' && (
         <div className="message messageStyle">
           Press Enter To Start Game
           <p><span style={{ color: 'red' }}>&uarr;</span> ArrowUp to Control</p>
         </div>
       )}
-
       {gameState === 'Ready' && (
         <div className="message messageStyle">
           Press <span style={{ color: 'red' }}>ArrowUp</span> to Begin!
         </div>
       )}
-
       {gameState === 'End' && (
         <div className="message messageStyle">
           <span style={{ color: 'red' }}>Game Over</span>
@@ -79,15 +54,12 @@ export default function Game() {
           Press Enter To Restart
         </div>
       )}
-
+      
       {/* Score Display */}
       <div className="score">
         <span className="score_title">SCORE</span>
         <span className="score_val">{score}</span>
       </div>
-
-      {/* Leaderboard */}
-      <Leaderboard currentScore={score} />
     </div>
   );
 }
