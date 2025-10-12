@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ethers } from 'ethers';
-import { usePrivy, CrossAppAccountWithMetadata } from "@privy-io/react-auth";
+import { usePrivy, useWallets, CrossAppAccountWithMetadata } from "@privy-io/react-auth";
 
 type GameState = 'Start' | 'Ready' | 'Play' | 'End';
 
