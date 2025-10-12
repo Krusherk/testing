@@ -71,6 +71,7 @@ export const useFlappyGame = () => {
       console.log('🔍 Debug - walletAddress:', walletAddress);
       console.log('🔍 Debug - authenticated:', authenticated);
       console.log('🔍 Debug - ready:', ready);
+      console.log('🔍 Debug - wallets count:', wallets.length);
       
       if (!walletAddress) {
         console.log('⚠️ No wallet address available yet');
@@ -82,6 +83,12 @@ export const useFlappyGame = () => {
         return;
       }
 
+      // Wait for wallets to load
+      if (wallets.length === 0) {
+        console.log('⚠️ Wallets not loaded yet, waiting...');
+        return;
+      }
+
       try {
         // Find the actual wallet object from useWallets() that matches our address
         const privyWallet = wallets.find(w => 
@@ -90,7 +97,8 @@ export const useFlappyGame = () => {
         
         if (!privyWallet) {
           console.log('⚠️ Could not find matching wallet in wallets array');
-          console.log('Available wallets:', wallets.map(w => w.address));
+          console.log('Looking for:', walletAddress);
+          console.log('Available wallets:', wallets.map(w => ({ address: w.address, type: w.walletClientType })));
           return;
         }
 
