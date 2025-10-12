@@ -56,7 +56,7 @@ export const useFlappyGame = () => {
   const pipes = useRef<HTMLDivElement[]>([]);
   const frameCount = useRef(0);
   const backgroundRect = useRef<DOMRect>();
-  const providerRef = useRef<ethers.BrowserProvider | null>(null);
+  const providerRef = useRef<ethers.providers.Web3Provider | null>(null);
   const contractRef = useRef<ethers.Contract | null>(null);
 
   // Game constants (leave untouched)
@@ -113,12 +113,12 @@ export const useFlappyGame = () => {
         // Get the EIP-1193 provider from Privy wallet
         const provider = await privyWallet.getEthersProvider();
         
-        // Wrap it in ethers BrowserProvider
-        const ethersProvider = new ethers.BrowserProvider(provider);
+        // Wrap it in ethers v5 Web3Provider
+        const ethersProvider = new ethers.providers.Web3Provider(provider);
         providerRef.current = ethersProvider;
 
         // Get signer
-        const signer = await ethersProvider.getSigner();
+        const signer = ethersProvider.getSigner();
         
         // Create contract instance with signer
         const contract = new ethers.Contract(
@@ -146,7 +146,7 @@ export const useFlappyGame = () => {
     };
 
     initBlockchain();
-  }, [walletAddress, authenticated, user, ready, wallets]);
+  }, [walletAddress, authenticated, user, ready, wallets, highScore]);
 
   // Load local high score from sessionStorage
   useEffect(() => {
@@ -158,7 +158,7 @@ export const useFlappyGame = () => {
         setHighScore(localScore);
       }
     }
-  }, [walletAddress]);
+  }, [walletAddress, highScore]);
 
   // Capture background dimensions
   useEffect(() => {
@@ -202,9 +202,9 @@ export const useFlappyGame = () => {
             
             // Reinitialize provider after network switch
             const provider = await privyWallet.getEthersProvider();
-            const ethersProvider = new ethers.BrowserProvider(provider);
+            const ethersProvider = new ethers.providers.Web3Provider(provider);
             providerRef.current = ethersProvider;
-            const signer = await ethersProvider.getSigner();
+            const signer = ethersProvider.getSigner();
             const contract = new ethers.Contract(
               FLAPPY_SCORE_CONTRACT, 
               FLAPPY_SCORE_ABI, 
@@ -228,7 +228,7 @@ export const useFlappyGame = () => {
 
       // Wait for confirmation
       const receipt = await tx.wait();
-      console.log('✅ Transaction confirmed:', receipt.hash);
+      console.log('✅ Transaction confirmed:', receipt.transactionHash);
 
       // Fetch updated high score
       const updated = await contractRef.current.getHighScore(walletAddress);
@@ -255,7 +255,7 @@ export const useFlappyGame = () => {
     } finally {
       setIsSubmittingScore(false);
     }
-  }, [walletAddress, user, wallets]);
+  }, [walletAddress, wallets]);
 
   const jump = useCallback(() => {
     if (gameState === 'Play') {
