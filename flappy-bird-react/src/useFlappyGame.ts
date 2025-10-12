@@ -13,7 +13,7 @@ const FLAPPY_SCORE_ABI = [
   "event HighScoreUpdated(address indexed player, uint256 newHighScore)"
 ];
 
-// Your deployed contract address on Monad Testnet
+// Deployed contract on Monad Testnet
 const FLAPPY_SCORE_CONTRACT = "0x8Fcbf421331122e6FDC98bAB9C254fC6f683968d";
 const MONAD_TESTNET_CHAIN_ID = 10143;
 
@@ -25,7 +25,7 @@ export const useFlappyGame = (walletAddress?: string) => {
   const [blockchainHighScore, setBlockchainHighScore] = useState(0);
   const [isSubmittingScore, setIsSubmittingScore] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  
+
   const birdRef = useRef<HTMLImageElement>(null);
   const gameLoopRef = useRef<number>();
   const birdDy = useRef(0);
@@ -35,51 +35,44 @@ export const useFlappyGame = (walletAddress?: string) => {
   const providerRef = useRef<BrowserProvider | null>(null);
   const contractRef = useRef<Contract | null>(null);
 
-  // Game constants
+  // Game constants (leave untouched)
   const moveSpeed = 0.65;
   const gravity = 0.6;
   const pipeGap = 35;
   const jumpForce = -7.9;
-  
-  // Initialize blockchain connection
+
+  // Initialize blockchain provider and contract
   useEffect(() => {
     const initBlockchain = async () => {
       if (typeof window.ethereum !== 'undefined' && walletAddress) {
         try {
           const provider = new BrowserProvider(window.ethereum);
           providerRef.current = provider;
-          
-          const contract = new Contract(
-            FLAPPY_SCORE_CONTRACT,
-            FLAPPY_SCORE_ABI,
-            await provider.getSigner()
-          );
+
+          const signer = await provider.getSigner();
+          const contract = new Contract(FLAPPY_SCORE_CONTRACT, FLAPPY_SCORE_ABI, signer);
           contractRef.current = contract;
-          
-          // Fetch blockchain high score
+
           const onChainHighScore = await contract.getHighScore(walletAddress);
-          setBlockchainHighScore(Number(onChainHighScore));
-          
-          // Use blockchain high score if higher than local
-          if (Number(onChainHighScore) > highScore) {
-            setHighScore(Number(onChainHighScore));
+          const numericHighScore = Number(onChainHighScore);
+          setBlockchainHighScore(numericHighScore);
+
+          if (numericHighScore > highScore) {
+            setHighScore(numericHighScore);
           }
         } catch (error) {
-          console.error('Failed to initialize blockchain:', error);
+          console.error('Blockchain init error:', error);
         }
       }
     };
-    
+
     initBlockchain();
   }, [walletAddress]);
 
-  // Load local high score on mount
+  // Load local high score from sessionStorage
   useEffect(() => {
-    const localHighScoreKey = walletAddress 
-      ? `flappy_highscore_${walletAddress}`
-      : 'flappy_highscore';
-    
-    const saved = sessionStorage.getItem(localHighScoreKey);
+    const key = walletAddress ? `flappy_highscore_${walletAddress}` : 'flappy_highscore';
+    const saved = sessionStorage.getItem(key);
     if (saved) {
       const localScore = parseInt(saved);
       if (localScore > highScore) {
@@ -88,42 +81,35 @@ export const useFlappyGame = (walletAddress?: string) => {
     }
   }, [walletAddress]);
 
+  // Capture background dimensions
   useEffect(() => {
-    const background = document.querySelector('.background') as HTMLElement;
-    if (background) {
-      backgroundRect.current = background.getBoundingClientRect();
-    }
+    const bg = document.querySelector('.background') as HTMLElement;
+    if (bg) backgroundRect.current = bg.getBoundingClientRect();
   }, []);
 
   // Submit score to blockchain
   const submitScoreToBlockchain = useCallback(async (finalScore: number) => {
-    if (!contractRef.current || !walletAddress || finalScore === 0) {
-      return;
-    }
+    if (!contractRef.current || !providerRef.current || !walletAddress || finalScore <= 0) return;
 
     setIsSubmittingScore(true);
     setSubmitError(null);
 
     try {
-      // Check if we're on the correct network
-      const network = await providerRef.current?.getNetwork();
-      if (network && Number(network.chainId) !== MONAD_TESTNET_CHAIN_ID) {
+      const network = await providerRef.current.getNetwork();
+      if (!network || Number(network.chainId) !== MONAD_TESTNET_CHAIN_ID) {
         throw new Error('Please switch to Monad Testnet');
       }
 
-      // Submit score transaction
       const tx = await contractRef.current.submitScore(finalScore);
       await tx.wait();
-      
-      console.log('Score submitted to blockchain:', finalScore);
-      
-      // Fetch updated blockchain high score
-      const newHighScore = await contractRef.current.getHighScore(walletAddress);
-      setBlockchainHighScore(Number(newHighScore));
-      
-    } catch (error: any) {
-      console.error('Failed to submit score to blockchain:', error);
-      setSubmitError(error.message || 'Failed to submit score');
+
+      console.log('✅ Score submitted to blockchain:', finalScore);
+
+      const updated = await contractRef.current.getHighScore(walletAddress);
+      setBlockchainHighScore(Number(updated));
+    } catch (err: any) {
+      console.error('Failed to submit score:', err);
+      setSubmitError(err.message || 'Blockchain error');
     } finally {
       setIsSubmittingScore(false);
     }
@@ -136,49 +122,36 @@ export const useFlappyGame = (walletAddress?: string) => {
   }, [gameState, jumpForce]);
 
   const endGame = useCallback(() => {
-    if (gameLoopRef.current) {
-      cancelAnimationFrame(gameLoopRef.current);
-      gameLoopRef.current = undefined;
-    }
-    
-    setGameState('End');
-    
-    if (birdRef.current) {
-      birdRef.current.style.display = 'none';
-    }
+    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+    gameLoopRef.current = undefined;
 
-    // Update local high score
-    const localHighScoreKey = walletAddress 
-      ? `flappy_highscore_${walletAddress}`
-      : 'flappy_highscore';
-    
+    setGameState('End');
+    if (birdRef.current) birdRef.current.style.display = 'none';
+
+    const key = walletAddress ? `flappy_highscore_${walletAddress}` : 'flappy_highscore';
     if (score > highScore) {
       setHighScore(score);
-      sessionStorage.setItem(localHighScoreKey, score.toString());
+      sessionStorage.setItem(key, score.toString());
     }
 
-    // Submit score to blockchain
     if (walletAddress && score > 0) {
       submitScoreToBlockchain(score);
     }
   }, [score, highScore, walletAddress, submitScoreToBlockchain]);
 
   const resetGame = useCallback(() => {
-    if (gameLoopRef.current) {
-      cancelAnimationFrame(gameLoopRef.current);
-      gameLoopRef.current = undefined;
-    }
-    
+    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+    gameLoopRef.current = undefined;
+
     document.querySelectorAll('.pipe_sprite').forEach(e => e.remove());
     pipes.current = [];
-    
+
     if (birdRef.current) {
       birdRef.current.style.display = 'block';
       birdRef.current.style.position = 'absolute';
-      const initialTop = window.innerHeight * 0.4;
-      birdRef.current.style.top = initialTop + 'px';
+      birdRef.current.style.top = window.innerHeight * 0.4 + 'px';
     }
-    
+
     birdDy.current = 0;
     setScore(0);
     setBirdTop(40);
@@ -187,13 +160,11 @@ export const useFlappyGame = (walletAddress?: string) => {
     setSubmitError(null);
   }, []);
 
+  // Core game loop (no tampering)
   const startGameLoop = useCallback(() => {
-    if (gameLoopRef.current) {
-      cancelAnimationFrame(gameLoopRef.current);
-    }
-    
+    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     setGameState('Play');
-    
+
     const gameLoop = () => {
       const bird = birdRef.current;
       if (!bird || !backgroundRect.current) {
@@ -202,19 +173,18 @@ export const useFlappyGame = (walletAddress?: string) => {
       }
 
       birdDy.current += gravity;
-      const newTopPixels = bird.offsetTop + birdDy.current;
-      
-      const gameHeight = backgroundRect.current ? backgroundRect.current.height : window.innerHeight;
-      if (newTopPixels <= 0 || newTopPixels + bird.clientHeight >= gameHeight) {
+      const newTop = bird.offsetTop + birdDy.current;
+      const gameHeight = backgroundRect.current.height || window.innerHeight;
+
+      if (newTop <= 0 || newTop + bird.clientHeight >= gameHeight) {
         endGame();
         return;
       }
-      
-      bird.style.position = 'absolute';
-      bird.style.top = newTopPixels + 'px';
-      
+
+      bird.style.top = newTop + 'px';
       const birdProps = bird.getBoundingClientRect();
 
+      // Pipes & collisions untouched
       if (frameCount.current % 45 === 0) {
         const pipePos = Math.floor(Math.random() * 43) + 8;
 
@@ -222,7 +192,7 @@ export const useFlappyGame = (walletAddress?: string) => {
         pipeTop.className = 'pipe_sprite';
         pipeTop.style.position = 'fixed';
         pipeTop.style.top = '0vh';
-        pipeTop.style.height = (pipePos) + 'vh';
+        pipeTop.style.height = `${pipePos}vh`;
         pipeTop.style.left = '100vw';
         pipeTop.style.width = '6vw';
         pipeTop.style.zIndex = '10';
@@ -230,8 +200,8 @@ export const useFlappyGame = (walletAddress?: string) => {
         const pipeBottom = document.createElement('div');
         pipeBottom.className = 'pipe_sprite';
         pipeBottom.style.position = 'fixed';
-        pipeBottom.style.top = (pipePos + pipeGap) + 'vh';
-        pipeBottom.style.height = (100 - pipePos - pipeGap) + 'vh';
+        pipeBottom.style.top = `${pipePos + pipeGap}vh`;
+        pipeBottom.style.height = `${100 - pipePos - pipeGap}vh`;
         pipeBottom.style.left = '100vw';
         pipeBottom.style.width = '6vw';
         pipeBottom.style.zIndex = '10';
@@ -243,31 +213,28 @@ export const useFlappyGame = (walletAddress?: string) => {
       }
 
       pipes.current = pipes.current.filter(pipe => {
-        const pipeRect = pipe.getBoundingClientRect();
-
-        if (pipeRect.right <= 0) {
+        const rect = pipe.getBoundingClientRect();
+        if (rect.right <= 0) {
           pipe.remove();
           return false;
         }
 
-        const currentLeft = parseFloat(pipe.style.left);
-        pipe.style.left = (currentLeft - moveSpeed) + 'vw';
+        pipe.style.left = `${parseFloat(pipe.style.left) - moveSpeed}vw`;
 
-        if ((pipe as any).increase_score && pipeRect.right < birdProps.left) {
+        if ((pipe as any).increase_score && rect.right < birdProps.left) {
           setScore(prev => prev + 1);
           (pipe as any).increase_score = false;
         }
 
         if (
-          birdProps.left < pipeRect.left + pipeRect.width &&
-          birdProps.left + birdProps.width > pipeRect.left &&
-          birdProps.top < pipeRect.top + pipeRect.height &&
-          birdProps.top + birdProps.height > pipeRect.top
+          birdProps.left < rect.left + rect.width &&
+          birdProps.left + birdProps.width > rect.left &&
+          birdProps.top < rect.top + rect.height &&
+          birdProps.top + birdProps.height > rect.top
         ) {
           endGame();
           return false;
         }
-        
         return true;
       });
 
@@ -278,24 +245,15 @@ export const useFlappyGame = (walletAddress?: string) => {
     gameLoopRef.current = requestAnimationFrame(gameLoop);
   }, [endGame]);
 
-  // Keyboard controls
+  // Controls (untouched)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       e.preventDefault();
-      
-      if (e.key === 'Enter') {
-        const currentState = gameState;
-        if (currentState !== 'Play') {
-          resetGame();
-        }
-      }
+
+      if (e.key === 'Enter' && gameState !== 'Play') resetGame();
       if (e.key === 'ArrowUp' || e.key === ' ') {
-        const currentState = gameState;
-        if (currentState === 'Ready') {
-          startGameLoop();
-        } else if (currentState === 'Play') {
-          birdDy.current = jumpForce;
-        }
+        if (gameState === 'Ready') startGameLoop();
+        else if (gameState === 'Play') birdDy.current = jumpForce;
       }
     };
 
@@ -303,32 +261,23 @@ export const useFlappyGame = (walletAddress?: string) => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [gameState, resetGame, startGameLoop, jumpForce]);
 
-  // Touch controls
   useEffect(() => {
     const handleTouch = (e: TouchEvent) => {
       e.preventDefault();
-      
-      const currentState = gameState;
-      if (currentState === 'Start') {
-        resetGame();
-      } else if (currentState === 'Ready') {
-        startGameLoop();
-      } else if (currentState === 'Play') {
-        birdDy.current = jumpForce;
-      }
+
+      if (gameState === 'Start') resetGame();
+      else if (gameState === 'Ready') startGameLoop();
+      else if (gameState === 'Play') birdDy.current = jumpForce;
     };
 
     document.addEventListener('touchstart', handleTouch, { passive: false });
     return () => document.removeEventListener('touchstart', handleTouch);
   }, [gameState, resetGame, startGameLoop, jumpForce]);
 
-  // Cleanup
   useEffect(() => {
     return () => {
-      if (gameLoopRef.current) {
-        cancelAnimationFrame(gameLoopRef.current);
-      }
-      pipes.current.forEach(pipe => pipe.remove());
+      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+      pipes.current.forEach(p => p.remove());
     };
   }, []);
 
@@ -344,6 +293,6 @@ export const useFlappyGame = (walletAddress?: string) => {
     jump,
     resetGame,
     isSubmittingScore,
-    submitError
+    submitError,
   };
 };
