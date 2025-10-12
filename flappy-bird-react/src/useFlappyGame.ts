@@ -14,14 +14,16 @@ const FLAPPY_SCORE_ABI = [
   "event HighScoreUpdated(address indexed player, uint256 newHighScore)"
 ];
 
-// Deployed contract on Monad Testnet
-const FLAPPY_SCORE_CONTRACT = "0x8Fcbf421331122e6FDC98bAB9C254fC6f683968d";
+// Deployed contract on Monad Testnet (Updated with correct MonadClip interface)
+const FLAPPY_SCORE_CONTRACT = "0x0C526A49E530177554A2de360aD0FEADe0cd6Db2";
 const MONAD_TESTNET_CHAIN_ID = 10143;
+const MONAD_RPC_URL = "https://testnet-rpc.monad.xyz";
 
 export const useFlappyGame = () => {
   const { authenticated, user, ready } = usePrivy();
   const { wallets } = useWallets();
   const [walletAddress, setWalletAddress] = useState<string>('');
+  const [privyWalletReady, setPrivyWalletReady] = useState(false);
   
   // Extract wallet address the same way as Home.tsx
   useEffect(() => {
@@ -37,10 +39,26 @@ export const useFlappyGame = () => {
           const address = crossAppAccount.embeddedWallets[0].address;
           setWalletAddress(address);
           console.log('🎮 Game hook - wallet address set:', address);
+          
+          // Mark that we should wait for Privy wallet to be ready
+          setPrivyWalletReady(false);
         }
       }
     }
   }, [authenticated, user, ready]);
+
+  // Wait for Privy wallets to load
+  useEffect(() => {
+    if (wallets.length > 0 && walletAddress) {
+      const privyWallet = wallets.find(w => 
+        w.address.toLowerCase() === walletAddress.toLowerCase()
+      );
+      if (privyWallet) {
+        console.log('✅ Privy wallet is ready:', privyWallet.address);
+        setPrivyWalletReady(true);
+      }
+    }
+  }, [wallets, walletAddress]);
   
   const [gameState, setGameState] = useState<GameState>('Start');
   const [score, setScore] = useState(0);
@@ -71,6 +89,7 @@ export const useFlappyGame = () => {
       console.log('🔍 Debug - walletAddress:', walletAddress);
       console.log('🔍 Debug - authenticated:', authenticated);
       console.log('🔍 Debug - ready:', ready);
+      console.log('🔍 Debug - privyWalletReady:', privyWalletReady);
       console.log('🔍 Debug - wallets count:', wallets.length);
       
       if (!walletAddress) {
@@ -83,59 +102,37 @@ export const useFlappyGame = () => {
         return;
       }
 
-      // Wait for wallets to load - give it more time
-      if (wallets.length === 0) {
-        console.log('⚠️ Wallets not loaded yet, waiting...');
-        // Try again after a delay
-        setTimeout(() => {
-          console.log('⏳ Retrying wallet initialization...');
-        }, 1000);
+      if (!privyWalletReady || wallets.length === 0) {
+        console.log('⚠️ Waiting for Privy wallet to be ready...');
         return;
       }
 
       try {
-        // Find the actual wallet object from useWallets() that matches our address
+        console.log('🔗 Using Privy wallet for blockchain connection...');
+        
+        // Find the Privy wallet
         const privyWallet = wallets.find(w => 
           w.address.toLowerCase() === walletAddress.toLowerCase()
         );
         
         if (!privyWallet) {
-          console.log('⚠️ Could not find matching wallet in wallets array');
-          console.log('Looking for:', walletAddress);
-          console.log('Available wallets:', wallets.map(w => ({ address: w.address, type: w.walletClientType })));
+          console.error('❌ Could not find Privy wallet');
           return;
         }
 
-        console.log('🔗 Found matching wallet:', {
-          address: privyWallet.address,
-          walletClientType: privyWallet.walletClientType,
-          chainId: privyWallet.chainId
-        });
+        console.log('✅ Found Privy wallet:', privyWallet.walletClientType);
 
-        console.log('🔗 Getting provider from wallet...');
-
-        // Get the EIP-1193 provider from Privy wallet
-        let provider;
-        try {
-          provider = await privyWallet.getEthersProvider();
-          console.log('✅ Got provider from Privy wallet');
-        } catch (providerError) {
-          console.error('❌ Failed to get provider:', providerError);
-          // Try alternative method using Privy's embedded wallet
-          if (privyWallet.getEthereumProvider) {
-            provider = await privyWallet.getEthereumProvider();
-            console.log('✅ Got provider using alternative method');
-          } else {
-            throw new Error('Could not get provider from wallet');
-          }
-        }
+        // Get provider from Privy wallet (NOT window.ethereum!)
+        const privyProvider = await privyWallet.getEthersProvider();
+        console.log('✅ Got Privy provider');
         
-        // Wrap it in ethers v5 Web3Provider
-        const ethersProvider = new ethers.providers.Web3Provider(provider as any);
+        // Create ethers provider
+        const ethersProvider = new ethers.providers.Web3Provider(privyProvider as any);
         providerRef.current = ethersProvider;
 
-        // Get signer
+        // Get signer from Privy provider
         const signer = ethersProvider.getSigner();
+        console.log('✅ Got signer from Privy provider');
         
         // Create contract instance with signer
         const contract = new ethers.Contract(
@@ -156,14 +153,37 @@ export const useFlappyGame = () => {
           setHighScore(numericHighScore);
         }
 
-        console.log('✅ Blockchain initialized. High score:', numericHighScore);
+        console.log('✅ Blockchain initialized with Privy. High score:', numericHighScore);
       } catch (error) {
         console.error('❌ Blockchain init error:', error);
+        
+        // Fallback to RPC for read-only
+        console.log('🔗 Falling back to RPC read-only mode...');
+        try {
+          const rpcProvider = new ethers.providers.JsonRpcProvider(MONAD_RPC_URL);
+          const readOnlyContract = new ethers.Contract(
+            FLAPPY_SCORE_CONTRACT, 
+            FLAPPY_SCORE_ABI, 
+            rpcProvider
+          );
+
+          const onChainHighScore = await readOnlyContract.getHighScore(walletAddress);
+          const numericHighScore = Number(onChainHighScore);
+          setBlockchainHighScore(numericHighScore);
+
+          if (numericHighScore > highScore) {
+            setHighScore(numericHighScore);
+          }
+
+          console.log('✅ Fallback successful. High score:', numericHighScore);
+        } catch (fallbackError) {
+          console.error('❌ Fallback also failed:', fallbackError);
+        }
       }
     };
 
     initBlockchain();
-  }, [walletAddress, authenticated, user, ready, wallets, highScore]);
+  }, [walletAddress, authenticated, user, ready, privyWalletReady, wallets, highScore]);
 
   // Load local high score from sessionStorage
   useEffect(() => {
@@ -195,45 +215,52 @@ export const useFlappyGame = () => {
       return;
     }
 
+    // Check if we have a Privy wallet for transactions
+    if (!privyWalletReady || wallets.length === 0) {
+      console.log('⚠️ Privy wallet not ready, cannot submit score');
+      setSubmitError('Wallet not ready');
+      return;
+    }
+
     setIsSubmittingScore(true);
     setSubmitError(null);
 
     try {
-      // Check network
+      // Find the Privy wallet
+      const privyWallet = wallets.find(w => 
+        w.address.toLowerCase() === walletAddress.toLowerCase()
+      );
+
+      if (!privyWallet) {
+        throw new Error('Privy wallet not found');
+      }
+
+      // Check network using Privy provider
       const network = await providerRef.current.getNetwork();
       const chainId = Number(network.chainId);
       
       console.log('🔗 Current chain ID:', chainId);
 
       if (chainId !== MONAD_TESTNET_CHAIN_ID) {
-        // Get the wallet from useWallets for network switching
-        const privyWallet = wallets.find(w => 
-          w.address.toLowerCase() === walletAddress.toLowerCase()
-        );
-
-        if (privyWallet && privyWallet.switchChain) {
-          console.log('🔄 Attempting to switch to Monad Testnet...');
-          try {
-            await privyWallet.switchChain(MONAD_TESTNET_CHAIN_ID);
-            console.log('✅ Network switched successfully');
-            
-            // Reinitialize provider after network switch
-            const provider = await privyWallet.getEthersProvider();
-            const ethersProvider = new ethers.providers.Web3Provider(provider);
-            providerRef.current = ethersProvider;
-            const signer = ethersProvider.getSigner();
-            const contract = new ethers.Contract(
-              FLAPPY_SCORE_CONTRACT, 
-              FLAPPY_SCORE_ABI, 
-              signer
-            );
-            contractRef.current = contract;
-          } catch (switchError) {
-            console.error('❌ Failed to switch network:', switchError);
-            throw new Error(`Please switch to Monad Testnet (Chain ID: ${MONAD_TESTNET_CHAIN_ID})`);
-          }
+        console.log('🔄 Switching to Monad Testnet...');
+        
+        if (privyWallet.switchChain) {
+          await privyWallet.switchChain(MONAD_TESTNET_CHAIN_ID);
+          console.log('✅ Network switched');
+          
+          // Reinitialize provider
+          const provider = await privyWallet.getEthersProvider();
+          const ethersProvider = new ethers.providers.Web3Provider(provider as any);
+          providerRef.current = ethersProvider;
+          const signer = ethersProvider.getSigner();
+          const contract = new ethers.Contract(
+            FLAPPY_SCORE_CONTRACT, 
+            FLAPPY_SCORE_ABI, 
+            signer
+          );
+          contractRef.current = contract;
         } else {
-          throw new Error(`Please switch to Monad Testnet (Chain ID: ${MONAD_TESTNET_CHAIN_ID})`);
+          throw new Error('Please switch to Monad Testnet');
         }
       }
 
@@ -272,7 +299,7 @@ export const useFlappyGame = () => {
     } finally {
       setIsSubmittingScore(false);
     }
-  }, [walletAddress, wallets]);
+  }, [walletAddress, privyWalletReady, wallets]);
 
   const jump = useCallback(() => {
     if (gameState === 'Play') {
