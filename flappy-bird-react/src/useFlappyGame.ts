@@ -18,8 +18,28 @@ const FLAPPY_SCORE_ABI = [
 const FLAPPY_SCORE_CONTRACT = "0x8Fcbf421331122e6FDC98bAB9C254fC6f683968d";
 const MONAD_TESTNET_CHAIN_ID = 10143;
 
-export const useFlappyGame = (walletAddress?: string) => {
-  const { wallets } = useWallets();
+export const useFlappyGame = () => {
+  const { authenticated, user, ready } = usePrivy();
+  const [walletAddress, setWalletAddress] = useState<string>('');
+  
+  // Extract wallet address the same way as Home.tsx
+  useEffect(() => {
+    if (authenticated && user && ready) {
+      if (user.linkedAccounts && user.linkedAccounts.length > 0) {
+        const crossAppAccount = user.linkedAccounts.find(
+          account => account.type === "cross_app" && 
+          account.providerApp && 
+          account.providerApp.id === "cmd8euall0037le0my79qpz42"
+        ) as CrossAppAccountWithMetadata;
+
+        if (crossAppAccount && crossAppAccount.embeddedWallets && crossAppAccount.embeddedWallets.length > 0) {
+          const address = crossAppAccount.embeddedWallets[0].address;
+          setWalletAddress(address);
+          console.log('🎮 Game hook - wallet address set:', address);
+        }
+      }
+    }
+  }, [authenticated, user, ready]);
   
   const [gameState, setGameState] = useState<GameState>('Start');
   const [score, setScore] = useState(0);
@@ -48,38 +68,37 @@ export const useFlappyGame = (walletAddress?: string) => {
   useEffect(() => {
     const initBlockchain = async () => {
       console.log('🔍 Debug - walletAddress:', walletAddress);
-      console.log('🔍 Debug - wallets:', wallets);
-      console.log('🔍 Debug - wallets.length:', wallets.length);
+      console.log('🔍 Debug - authenticated:', authenticated);
+      console.log('🔍 Debug - ready:', ready);
       
       if (!walletAddress) {
-        console.log('⚠️ No wallet address provided');
+        console.log('⚠️ No wallet address available yet');
         return;
       }
       
-      if (wallets.length === 0) {
-        console.log('⚠️ No wallets available yet, waiting...');
+      if (!authenticated || !user) {
+        console.log('⚠️ User not authenticated');
         return;
       }
 
       try {
-        // Get any connected wallet (Privy embedded or imported)
-        const connectedWallet = wallets[0]; // Get first wallet
+        // Get the cross app account
+        const crossAppAccount = user.linkedAccounts?.find(
+          account => account.type === "cross_app" && 
+          account.providerApp && 
+          account.providerApp.id === "cmd8euall0037le0my79qpz42"
+        ) as CrossAppAccountWithMetadata;
         
-        console.log('🔗 Found wallet:', {
-          address: connectedWallet.address,
-          walletClientType: connectedWallet.walletClientType,
-          chainId: connectedWallet.chainId
-        });
-
-        if (!connectedWallet) {
-          console.log('⚠️ No wallet found in wallets array');
+        if (!crossAppAccount?.embeddedWallets?.[0]) {
+          console.log('⚠️ No embedded wallet found');
           return;
         }
 
-        console.log('🔗 Initializing with wallet:', connectedWallet.address);
+        console.log('🔗 Getting provider from embedded wallet...');
 
-        // Get the EIP-1193 provider from Privy wallet
-        const provider = await connectedWallet.getEthersProvider();
+        // Get the EIP-1193 provider from embedded wallet
+        const embeddedWallet = crossAppAccount.embeddedWallets[0];
+        const provider = await embeddedWallet.getEthersProvider();
         
         // Wrap it in ethers BrowserProvider
         const ethersProvider = new ethers.BrowserProvider(provider);
@@ -114,7 +133,7 @@ export const useFlappyGame = (walletAddress?: string) => {
     };
 
     initBlockchain();
-  }, [walletAddress, wallets]);
+  }, [walletAddress, authenticated, user, ready]);
 
   // Load local high score from sessionStorage
   useEffect(() => {
@@ -157,17 +176,23 @@ export const useFlappyGame = (walletAddress?: string) => {
       console.log('🔗 Current chain ID:', chainId);
 
       if (chainId !== MONAD_TESTNET_CHAIN_ID) {
-        // Try to switch network using Privy wallet
-        const connectedWallet = wallets[0];
+        // Get embedded wallet for network switching
+        const crossAppAccount = user?.linkedAccounts?.find(
+          account => account.type === "cross_app" && 
+          account.providerApp && 
+          account.providerApp.id === "cmd8euall0037le0my79qpz42"
+        ) as CrossAppAccountWithMetadata;
 
-        if (connectedWallet && connectedWallet.switchChain) {
+        const embeddedWallet = crossAppAccount?.embeddedWallets?.[0];
+
+        if (embeddedWallet && embeddedWallet.switchChain) {
           console.log('🔄 Attempting to switch to Monad Testnet...');
           try {
-            await connectedWallet.switchChain(MONAD_TESTNET_CHAIN_ID);
+            await embeddedWallet.switchChain(MONAD_TESTNET_CHAIN_ID);
             console.log('✅ Network switched successfully');
             
             // Reinitialize provider after network switch
-            const provider = await connectedWallet.getEthersProvider();
+            const provider = await embeddedWallet.getEthersProvider();
             const ethersProvider = new ethers.BrowserProvider(provider);
             providerRef.current = ethersProvider;
             const signer = await ethersProvider.getSigner();
@@ -221,7 +246,7 @@ export const useFlappyGame = (walletAddress?: string) => {
     } finally {
       setIsSubmittingScore(false);
     }
-  }, [walletAddress, wallets]);
+  }, [walletAddress, user]);
 
   const jump = useCallback(() => {
     if (gameState === 'Play') {
@@ -404,5 +429,6 @@ export const useFlappyGame = (walletAddress?: string) => {
     resetGame,
     isSubmittingScore,
     submitError,
+    walletAddress, // Export wallet address
   };
 };
