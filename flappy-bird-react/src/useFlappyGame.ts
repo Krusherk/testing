@@ -78,14 +78,18 @@ export const useFlappyGame = () => {
         return;
       }
       
-      if (!authenticated || !user) {
-        console.log('⚠️ User not authenticated');
+      if (!authenticated || !user || !ready) {
+        console.log('⚠️ User not authenticated or not ready');
         return;
       }
 
-      // Wait for wallets to load
+      // Wait for wallets to load - give it more time
       if (wallets.length === 0) {
         console.log('⚠️ Wallets not loaded yet, waiting...');
+        // Try again after a delay
+        setTimeout(() => {
+          console.log('⏳ Retrying wallet initialization...');
+        }, 1000);
         return;
       }
 
@@ -111,10 +115,23 @@ export const useFlappyGame = () => {
         console.log('🔗 Getting provider from wallet...');
 
         // Get the EIP-1193 provider from Privy wallet
-        const provider = await privyWallet.getEthersProvider();
+        let provider;
+        try {
+          provider = await privyWallet.getEthersProvider();
+          console.log('✅ Got provider from Privy wallet');
+        } catch (providerError) {
+          console.error('❌ Failed to get provider:', providerError);
+          // Try alternative method using Privy's embedded wallet
+          if (privyWallet.getEthereumProvider) {
+            provider = await privyWallet.getEthereumProvider();
+            console.log('✅ Got provider using alternative method');
+          } else {
+            throw new Error('Could not get provider from wallet');
+          }
+        }
         
         // Wrap it in ethers v5 Web3Provider
-        const ethersProvider = new ethers.providers.Web3Provider(provider);
+        const ethersProvider = new ethers.providers.Web3Provider(provider as any);
         providerRef.current = ethersProvider;
 
         // Get signer
