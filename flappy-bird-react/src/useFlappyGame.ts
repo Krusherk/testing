@@ -47,26 +47,39 @@ export const useFlappyGame = (walletAddress?: string) => {
   // Initialize blockchain provider and contract using Privy
   useEffect(() => {
     const initBlockchain = async () => {
-      if (!walletAddress || wallets.length === 0) {
-        console.log('⚠️ No wallet connected');
+      console.log('🔍 Debug - walletAddress:', walletAddress);
+      console.log('🔍 Debug - wallets:', wallets);
+      console.log('🔍 Debug - wallets.length:', wallets.length);
+      
+      if (!walletAddress) {
+        console.log('⚠️ No wallet address provided');
+        return;
+      }
+      
+      if (wallets.length === 0) {
+        console.log('⚠️ No wallets available yet, waiting...');
         return;
       }
 
       try {
-        // Get the embedded wallet from Privy
-        const embeddedWallet = wallets.find(
-          (wallet) => wallet.walletClientType === 'privy'
-        );
+        // Get any connected wallet (Privy embedded or imported)
+        const connectedWallet = wallets[0]; // Get first wallet
+        
+        console.log('🔗 Found wallet:', {
+          address: connectedWallet.address,
+          walletClientType: connectedWallet.walletClientType,
+          chainId: connectedWallet.chainId
+        });
 
-        if (!embeddedWallet) {
-          console.log('⚠️ No Privy embedded wallet found');
+        if (!connectedWallet) {
+          console.log('⚠️ No wallet found in wallets array');
           return;
         }
 
-        console.log('🔗 Initializing with Privy wallet:', embeddedWallet.address);
+        console.log('🔗 Initializing with wallet:', connectedWallet.address);
 
         // Get the EIP-1193 provider from Privy wallet
-        const provider = await embeddedWallet.getEthersProvider();
+        const provider = await connectedWallet.getEthersProvider();
         
         // Wrap it in ethers BrowserProvider
         const ethersProvider = new ethers.BrowserProvider(provider);
@@ -145,14 +158,29 @@ export const useFlappyGame = (walletAddress?: string) => {
 
       if (chainId !== MONAD_TESTNET_CHAIN_ID) {
         // Try to switch network using Privy wallet
-        const embeddedWallet = wallets.find(
-          (wallet) => wallet.walletClientType === 'privy'
-        );
+        const connectedWallet = wallets[0];
 
-        if (embeddedWallet) {
+        if (connectedWallet && connectedWallet.switchChain) {
           console.log('🔄 Attempting to switch to Monad Testnet...');
-          await embeddedWallet.switchChain(MONAD_TESTNET_CHAIN_ID);
-          console.log('✅ Network switched successfully');
+          try {
+            await connectedWallet.switchChain(MONAD_TESTNET_CHAIN_ID);
+            console.log('✅ Network switched successfully');
+            
+            // Reinitialize provider after network switch
+            const provider = await connectedWallet.getEthersProvider();
+            const ethersProvider = new ethers.BrowserProvider(provider);
+            providerRef.current = ethersProvider;
+            const signer = await ethersProvider.getSigner();
+            const contract = new ethers.Contract(
+              FLAPPY_SCORE_CONTRACT, 
+              FLAPPY_SCORE_ABI, 
+              signer
+            );
+            contractRef.current = contract;
+          } catch (switchError) {
+            console.error('❌ Failed to switch network:', switchError);
+            throw new Error(`Please switch to Monad Testnet (Chain ID: ${MONAD_TESTNET_CHAIN_ID})`);
+          }
         } else {
           throw new Error(`Please switch to Monad Testnet (Chain ID: ${MONAD_TESTNET_CHAIN_ID})`);
         }
