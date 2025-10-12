@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ethers } from 'ethers';
-const BrowserProvider = ethers.providers.Web3Provider;
-const { Contract } = ethers;
+import { useWallets } from "@privy-io/react-auth";
 
 type GameState = 'Start' | 'Ready' | 'Play' | 'End';
 
@@ -20,6 +19,8 @@ const FLAPPY_SCORE_CONTRACT = "0x8Fcbf421331122e6FDC98bAB9C254fC6f683968d";
 const MONAD_TESTNET_CHAIN_ID = 10143;
 
 export const useFlappyGame = (walletAddress?: string) => {
+  const { wallets } = useWallets();
+  
   const [gameState, setGameState] = useState<GameState>('Start');
   const [score, setScore] = useState(0);
   const [birdTop, setBirdTop] = useState(40);
@@ -34,8 +35,8 @@ export const useFlappyGame = (walletAddress?: string) => {
   const pipes = useRef<HTMLDivElement[]>([]);
   const frameCount = useRef(0);
   const backgroundRect = useRef<DOMRect>();
-  const providerRef = useRef<BrowserProvider | null>(null);
-  const contractRef = useRef<Contract | null>(null);
+  const providerRef = useRef<ethers.BrowserProvider | null>(null);
+  const contractRef = useRef<ethers.Contract | null>(null);
 
   // Game constants (leave untouched)
   const moveSpeed = 0.65;
@@ -43,33 +44,64 @@ export const useFlappyGame = (walletAddress?: string) => {
   const pipeGap = 35;
   const jumpForce = -7.9;
 
-  // Initialize blockchain provider and contract
+  // Initialize blockchain provider and contract using Privy
   useEffect(() => {
     const initBlockchain = async () => {
-      if (typeof window.ethereum !== 'undefined' && walletAddress) {
-        try {
-          const provider = new BrowserProvider(window.ethereum);
-          providerRef.current = provider;
+      if (!walletAddress || wallets.length === 0) {
+        console.log('⚠️ No wallet connected');
+        return;
+      }
 
-          const signer = await provider.getSigner();
-          const contract = new Contract(FLAPPY_SCORE_CONTRACT, FLAPPY_SCORE_ABI, signer);
-          contractRef.current = contract;
+      try {
+        // Get the embedded wallet from Privy
+        const embeddedWallet = wallets.find(
+          (wallet) => wallet.walletClientType === 'privy'
+        );
 
-          const onChainHighScore = await contract.getHighScore(walletAddress);
-          const numericHighScore = Number(onChainHighScore);
-          setBlockchainHighScore(numericHighScore);
-
-          if (numericHighScore > highScore) {
-            setHighScore(numericHighScore);
-          }
-        } catch (error) {
-          console.error('Blockchain init error:', error);
+        if (!embeddedWallet) {
+          console.log('⚠️ No Privy embedded wallet found');
+          return;
         }
+
+        console.log('🔗 Initializing with Privy wallet:', embeddedWallet.address);
+
+        // Get the EIP-1193 provider from Privy wallet
+        const provider = await embeddedWallet.getEthersProvider();
+        
+        // Wrap it in ethers BrowserProvider
+        const ethersProvider = new ethers.BrowserProvider(provider);
+        providerRef.current = ethersProvider;
+
+        // Get signer
+        const signer = await ethersProvider.getSigner();
+        
+        // Create contract instance with signer
+        const contract = new ethers.Contract(
+          FLAPPY_SCORE_CONTRACT, 
+          FLAPPY_SCORE_ABI, 
+          signer
+        );
+        contractRef.current = contract;
+
+        console.log('📝 Contract initialized at:', FLAPPY_SCORE_CONTRACT);
+
+        // Fetch high score from blockchain
+        const onChainHighScore = await contract.getHighScore(walletAddress);
+        const numericHighScore = Number(onChainHighScore);
+        setBlockchainHighScore(numericHighScore);
+
+        if (numericHighScore > highScore) {
+          setHighScore(numericHighScore);
+        }
+
+        console.log('✅ Blockchain initialized. High score:', numericHighScore);
+      } catch (error) {
+        console.error('❌ Blockchain init error:', error);
       }
     };
 
     initBlockchain();
-  }, [walletAddress]);
+  }, [walletAddress, wallets]);
 
   // Load local high score from sessionStorage
   useEffect(() => {
@@ -91,31 +123,77 @@ export const useFlappyGame = (walletAddress?: string) => {
 
   // Submit score to blockchain
   const submitScoreToBlockchain = useCallback(async (finalScore: number) => {
-    if (!contractRef.current || !providerRef.current || !walletAddress || finalScore <= 0) return;
+    if (!contractRef.current || !providerRef.current || !walletAddress || finalScore <= 0) {
+      console.log('⚠️ Score submission skipped:', {
+        hasContract: !!contractRef.current,
+        hasProvider: !!providerRef.current,
+        hasWallet: !!walletAddress,
+        score: finalScore
+      });
+      return;
+    }
 
     setIsSubmittingScore(true);
     setSubmitError(null);
 
     try {
+      // Check network
       const network = await providerRef.current.getNetwork();
-      if (!network || Number(network.chainId) !== MONAD_TESTNET_CHAIN_ID) {
-        throw new Error('Please switch to Monad Testnet');
+      const chainId = Number(network.chainId);
+      
+      console.log('🔗 Current chain ID:', chainId);
+
+      if (chainId !== MONAD_TESTNET_CHAIN_ID) {
+        // Try to switch network using Privy wallet
+        const embeddedWallet = wallets.find(
+          (wallet) => wallet.walletClientType === 'privy'
+        );
+
+        if (embeddedWallet) {
+          console.log('🔄 Attempting to switch to Monad Testnet...');
+          await embeddedWallet.switchChain(MONAD_TESTNET_CHAIN_ID);
+          console.log('✅ Network switched successfully');
+        } else {
+          throw new Error(`Please switch to Monad Testnet (Chain ID: ${MONAD_TESTNET_CHAIN_ID})`);
+        }
       }
 
+      console.log('📤 Submitting score to blockchain:', finalScore);
+
+      // Submit score transaction
       const tx = await contractRef.current.submitScore(finalScore);
-      await tx.wait();
+      console.log('⏳ Transaction sent:', tx.hash);
 
-      console.log('✅ Score submitted to blockchain:', finalScore);
+      // Wait for confirmation
+      const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed:', receipt.hash);
 
+      // Fetch updated high score
       const updated = await contractRef.current.getHighScore(walletAddress);
-      setBlockchainHighScore(Number(updated));
+      const updatedScore = Number(updated);
+      setBlockchainHighScore(updatedScore);
+      
+      console.log('🏆 Updated blockchain high score:', updatedScore);
     } catch (err: any) {
-      console.error('Failed to submit score:', err);
-      setSubmitError(err.message || 'Blockchain error');
+      console.error('❌ Failed to submit score:', err);
+      
+      // Better error messages
+      let errorMsg = 'Failed to submit score';
+      if (err.code === 'ACTION_REJECTED' || err.message?.includes('rejected')) {
+        errorMsg = 'Transaction rejected by user';
+      } else if (err.message?.includes('insufficient funds')) {
+        errorMsg = 'Insufficient funds for gas';
+      } else if (err.message?.includes('network')) {
+        errorMsg = 'Network error. Please check your connection.';
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      
+      setSubmitError(errorMsg);
     } finally {
       setIsSubmittingScore(false);
     }
-  }, [walletAddress]);
+  }, [walletAddress, wallets]);
 
   const jump = useCallback(() => {
     if (gameState === 'Play') {
@@ -136,7 +214,9 @@ export const useFlappyGame = (walletAddress?: string) => {
       sessionStorage.setItem(key, score.toString());
     }
 
+    // Submit to blockchain
     if (walletAddress && score > 0) {
+      console.log('🎮 Game ended with score:', score);
       submitScoreToBlockchain(score);
     }
   }, [score, highScore, walletAddress, submitScoreToBlockchain]);
