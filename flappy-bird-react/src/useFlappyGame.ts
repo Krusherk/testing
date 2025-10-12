@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { BrowserProvider, Contract } from 'ethers';
+import { ethers } from 'ethers';
+const BrowserProvider = ethers.providers.Web3Provider;
+const { Contract } = ethers;
 
 type GameState = 'Start' | 'Ready' | 'Play' | 'End';
 
