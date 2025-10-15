@@ -125,6 +125,29 @@ export const useFlappyGame = () => {
         // Get provider from Privy wallet (NOT window.ethereum!)
         const privyProvider = await privyWallet.getEthersProvider();
         console.log('✅ Got Privy provider');
+        console.log('🔍 Privy provider type:', typeof privyProvider);
+        console.log('🔍 Privy provider object:', privyProvider);
+        console.log('🔍 Privy provider keys:', Object.keys(privyProvider || {}));
+        console.log('🔍 Has request method:', typeof (privyProvider as any)?.request);
+        console.log('🔍 Has send method:', typeof (privyProvider as any)?.send);
+        console.log('🔍 Has sendAsync method:', typeof (privyProvider as any)?.sendAsync);
+        
+        // Check if it's actually connected
+        if ((privyProvider as any)?.request) {
+          try {
+            const accounts = await (privyProvider as any).request({ method: 'eth_accounts' });
+            console.log('🔍 Provider accounts:', accounts);
+          } catch (err) {
+            console.log('⚠️ Failed to get accounts:', err);
+          }
+          
+          try {
+            const chainId = await (privyProvider as any).request({ method: 'eth_chainId' });
+            console.log('🔍 Provider chainId:', chainId, '(decimal:', parseInt(chainId, 16), ')');
+          } catch (err) {
+            console.log('⚠️ Failed to get chainId:', err);
+          }
+        }
         
         // Create ethers provider
         const ethersProvider = new ethers.providers.Web3Provider(privyProvider as any);
